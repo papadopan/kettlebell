@@ -4,13 +4,19 @@ import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
 import { Bell } from '@/components/Bell';
 import { Body, Button, Chip, Eyebrow, IconButton, Row, Screen, Title } from '@/components/ui';
+import { useBells } from '@/store/bells';
 import { bellColor, colors, fonts, themedStyles } from '@/theme';
 
 const FEEL = ['Easy', 'About right', 'Hard'];
 
 export default function Summary() {
-  const p = useLocalSearchParams<{ name?: string; minutes?: string; rounds?: string; reps?: string; kg?: string; seconds?: string }>();
+  const p = useLocalSearchParams<{ bell?: string; name?: string; minutes?: string; rounds?: string; reps?: string; kg?: string; seconds?: string }>();
   const [feel, setFeel] = useState('About right');
+  const { weights } = useBells();
+  const bell = Number(p.bell ?? 0);
+  // Progression: after an easy session suggest the next bell you own, or the next standard size if you have none heavier.
+  const heavierOwned = weights.find((kg) => kg > bell);
+  const nextSize = heavierOwned ?? bell + 4;
   const seconds = Number(p.seconds ?? 0);
   const time = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
   const kg = Number(p.kg ?? 0);
@@ -54,18 +60,30 @@ export default function Summary() {
       </View>
 
 
-      <View style={styles.nextBell}>
-        <Bell kg={24} size={44} />
-        <View style={{ flex: 1, gap: 4 }}>
-          <Text style={styles.strong}>Almost ready for 24 kg</Text>
-          <Body muted style={{ fontSize: 12, lineHeight: 17 }}>
-            Two more sessions at 20 kg and your swings move up. No 24 yet?
-          </Body>
-          <Pressable accessibilityRole="link">
-            <Text style={styles.link}>Browse 24 kg bells · partner shop</Text>
-          </Pressable>
+      {bell ? (
+        <View style={styles.nextBell}>
+          <Bell kg={nextSize} size={44} />
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={styles.strong}>
+              {feel === 'Easy' ? `Ready for ${nextSize} kg` : `Today: ${bell} kg`}
+            </Text>
+            <Body muted style={{ fontSize: 12, lineHeight: 17 }}>
+              {feel === 'Easy'
+                ? heavierOwned
+                  ? `That felt easy. Next time, pick your ${nextSize} kg bell for this workout.`
+                  : `That felt easy and ${bell} kg is your heaviest bell.`
+                : feel === 'Hard'
+                  ? 'Stay at this weight until it feels about right.'
+                  : 'Mark it “Easy” when it is, and we’ll suggest the next bell.'}
+            </Body>
+            {feel === 'Easy' && !heavierOwned ? (
+              <Pressable accessibilityRole="link">
+                <Text style={styles.link}>Browse {nextSize} kg bells · partner shop</Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
-      </View>
+      ) : null}
 
       <View style={{ gap: 10 }}>
         <Eyebrow>How did it feel?</Eyebrow>

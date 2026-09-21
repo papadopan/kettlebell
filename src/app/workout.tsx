@@ -8,15 +8,15 @@ import { ExerciseDemo, ExerciseHowToSheet } from '@/components/ExerciseDemo';
 import { Icon } from '@/components/Icon';
 import { findExercise } from '@/data/exercises';
 import { IconButton, Row, Screen } from '@/components/ui';
-import { exerciseName, getWorkout, itemForMinute, kgFor, loadFor, repsFor, repsLabel } from '@/data/workouts';
-import { useBells } from '@/store/bells';
+import { exerciseName, getWorkout, itemForMinute, kgFor, repsFor, repsLabel } from '@/data/workouts';
 import { bellColor, colors, fonts, themedStyles } from '@/theme';
 
 type Credit = { reps: number; kg: number };
 
 export default function Workout() {
-  const params = useLocalSearchParams<{ id?: string }>();
-  const { weights } = useBells();
+  const params = useLocalSearchParams<{ id?: string; kg?: string }>();
+  /** The one bell weight used for the whole workout. */
+  const bell = Number(params.kg ?? 0);
   const plan = getWorkout(params.id ?? '');
   const total = plan?.minutes ?? 0;
   const [minute, setMinute] = useState(1);
@@ -29,8 +29,8 @@ export default function Workout() {
   const current = plan ? itemForMinute(plan, minute) : undefined;
   const next = plan ? itemForMinute(plan, minute + 1) : undefined;
   const currentEx = current ? findExercise(current.exerciseId) : undefined;
-  const currentKg = current ? loadFor(current.load, weights) : 0;
-  const nextKg = next ? loadFor(next.load, weights) : 0;
+  const currentKg = current ? bell : 0;
+  const nextKg = next ? bell : 0;
 
   const moved = Object.values(credits).reduce((a, c) => a + c.kg, 0);
   const reps = Object.values(credits).reduce((a, c) => a + c.reps, 0);
@@ -42,6 +42,7 @@ export default function Workout() {
       pathname: '/summary',
       params: {
         name: plan?.name ?? 'Workout',
+        bell: String(bell),
         minutes: String(total),
         rounds: String(list.length),
         reps: String(list.reduce((a, x) => a + x.reps, 0)),
@@ -63,6 +64,13 @@ export default function Workout() {
   useEffect(() => {
     if (secondsLeft > 0) return;
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+    // The minute ran out without Done: assume the set was done and log it, so the bar fills in.
+    const updated = credits[minute] || !current ? credits : { ...credits, [minute]: { reps: repsFor(current), kg: kgFor(current, bell) } };
+    if (updated !== credits) setCredits(updated);
+    if (minute >= total) {
+      finish(updated);
+      return;
+    }
     advance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [secondsLeft]);
@@ -90,7 +98,7 @@ export default function Workout() {
   const markDone = () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
     if (!current) return;
-    const updated = { ...credits, [minute]: { reps: repsFor(current), kg: kgFor(current, weights) } };
+    const updated = { ...credits, [minute]: { reps: repsFor(current), kg: kgFor(current, bell) } };
     setCredits(updated);
     if (minute >= total) finish(updated);
   };
@@ -153,7 +161,7 @@ export default function Workout() {
             </Text>
             <Text style={styles.reps}>
               {current ? repsLabel(current).replace(' / side', ' per side') : ''}
-              {currentKg ? ` · ${currentKg} kg` : ''}
+              {currentKg ? ` · ${current?.twoBells ? '2 × ' : ''}${currentKg} kg` : ''}
             </Text>
           </View>
           <Pressable accessibilityRole="button" onPress={() => setHowTo(true)} style={styles.howBtn} hitSlop={6}>

@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { Body, Chip, Eyebrow, Title } from '@/components/ui';
 import { levelLabel } from '@/data/labels';
-import { exerciseName, Group, groupLabel, GROUPS, Workout, workouts } from '@/data/workouts';
+import { exerciseName, Group, groupLabel, GROUPS, needsPair, Workout, workouts } from '@/data/workouts';
 import { colors, fonts, space, themedStyles } from '@/theme';
 
 function WorkoutCard({ w }: { w: Workout }) {
@@ -19,7 +19,7 @@ function WorkoutCard({ w }: { w: Workout }) {
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Eyebrow>{groupLabel(w.group)}</Eyebrow>
         <Text style={styles.meta}>
-          {w.minutes} min · {levelLabel(w.level)}
+          {w.minutes} min · {levelLabel(w.level)} · {needsPair(w) ? '2 bells' : '1 bell'}
         </Text>
       </View>
       <Text style={styles.name}>{w.name}</Text>

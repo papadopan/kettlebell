@@ -6,17 +6,24 @@ import { IBMPlexSans_400Regular } from '@expo-google-fonts/ibm-plex-sans/400Regu
 import { IBMPlexSans_500Medium } from '@expo-google-fonts/ibm-plex-sans/500Medium';
 import { IBMPlexSans_600SemiBold } from '@expo-google-fonts/ibm-plex-sans/600SemiBold';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { ErrorBoundaryProps, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { CrashScreen } from '@/components/CrashScreen';
 import { BellsProvider } from '@/store/bells';
 import { ThemeProvider, useTheme } from '@/store/theme';
 import { colors } from '@/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+/** Expo Router shows this instead of crashing when any screen throws while rendering. */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  SplashScreen.hideAsync().catch(() => {});
+  return <CrashScreen error={error} retry={retry} />;
+}
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({

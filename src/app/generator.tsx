@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Bell } from '@/components/Bell';
 import { BackLink, Button, Chip, Eyebrow, Screen, Title } from '@/components/ui';
-import { generateWorkout, Goal, Group, GROUPS } from '@/data/workouts';
+import { defaultBell, generateWorkout, Goal, Group, GROUPS } from '@/data/workouts';
 import { useBells } from '@/store/bells';
 import { bellColor, colors, fonts, themedStyles } from '@/theme';
 
@@ -17,14 +17,17 @@ const GOALS: { id: Goal; hint: string }[] = [
 
 export default function Generator() {
   const params = useLocalSearchParams<{ group?: Group }>();
-  const { rack } = useBells();
+  const { owned, weights, level } = useBells();
   const [group, setGroup] = useState<Group>(params.group ?? 'full');
   const [minutes, setMinutes] = useState(20);
   const [goal, setGoal] = useState<Goal>('Strength');
+  const [bell, setBell] = useState<number | undefined>(() => defaultBell(weights, level));
+  const [pair, setPair] = useState(false);
+  const canPair = bell !== undefined && (owned[bell] ?? 0) >= 2;
 
   const build = () => {
-    const w = generateWorkout({ group, minutes, goal });
-    router.push({ pathname: '/routine', params: { id: w.id } });
+    const w = generateWorkout({ group, minutes, goal, pair: pair && canPair });
+    router.push({ pathname: '/routine', params: bell ? { id: w.id, kg: String(bell) } : { id: w.id } });
   };
 
   return (
@@ -61,19 +64,37 @@ export default function Generator() {
       </View>
 
       <View style={styles.section}>
-        <Eyebrow>Your bells</Eyebrow>
+        <Eyebrow>Bell for this workout</Eyebrow>
         <View style={styles.wrap}>
-          {rack.map((kg, i) => (
-            <View key={`${kg}-${i}`} style={[styles.bell, { borderColor: bellColor(kg) }]}>
-              <Bell kg={kg} size={26} />
-              <Text style={styles.bellLabel}>{kg}</Text>
-            </View>
-          ))}
+          {weights.map((kg) => {
+            const on = kg === bell;
+            return (
+              <Pressable
+                key={kg}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: on }}
+                onPress={() => setBell(kg)}
+                style={[styles.bell, { borderColor: on ? bellColor(kg) : colors.surface2 }]}
+              >
+                <Bell kg={kg} size={26} filled={on} />
+                <Text style={styles.bellLabel}>
+                  {kg}
+                  {(owned[kg] ?? 0) >= 2 ? ' ×2' : ''}
+                </Text>
+              </Pressable>
+            );
+          })}
           <Pressable accessibilityRole="button" accessibilityLabel="Edit my bells" onPress={() => router.push('/onboarding/bells')} style={styles.addBell}>
             <Text style={styles.addLabel}>+</Text>
           </Pressable>
         </View>
-        <Text style={styles.hint}>Light, medium and heavy sets use your lightest, middle and heaviest bell.</Text>
+        {canPair ? (
+          <View style={styles.wrap}>
+            <Chip label="One bell" selected={!pair} onPress={() => setPair(false)} />
+            <Chip label={`Pair of ${bell} kg`} selected={pair} onPress={() => setPair(true)} />
+          </View>
+        ) : null}
+        <Text style={styles.hint}>The whole workout uses this weight. Go heavier as it gets easier.</Text>
       </View>
     </Screen>
   );

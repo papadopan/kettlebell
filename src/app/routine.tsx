@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { Image, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
 import { Bell } from '@/components/Bell';
@@ -6,13 +7,13 @@ import { Icon } from '@/components/Icon';
 import { BackLink, Body, Button, Eyebrow, IconButton, Row, Screen, Title } from '@/components/ui';
 import { findExercise } from '@/data/exercises';
 import { levelLabel } from '@/data/labels';
-import { exerciseName, generateWorkout, getWorkout, Group, groupLabel, loadFor, repsLabel, totals, WorkoutItem } from '@/data/workouts';
+import { defaultBell, exerciseName, generateWorkout, getWorkout, Group, groupLabel, needsPair, repsLabel, totals, usableWeights, WorkoutItem } from '@/data/workouts';
 import { useBells } from '@/store/bells';
-import { colors, fonts, themedStyles } from '@/theme';
+import { bellColor, colors, fonts, themedStyles } from '@/theme';
 
-function ItemRow({ item, index, weights }: { item: WorkoutItem; index: number; weights: number[] }) {
+function ItemRow({ item, index, bell }: { item: WorkoutItem; index: number; bell?: number }) {
   const ex = findExercise(item.exerciseId);
-  const kg = loadFor(item.load, weights);
+  const kg = bell ?? 0;
   return (
     <Pressable
       accessibilityRole="button"
@@ -27,18 +28,10 @@ function ItemRow({ item, index, weights }: { item: WorkoutItem; index: number; w
         <Text style={styles.name} numberOfLines={1}>
           {exerciseName(item.exerciseId)}
         </Text>
-        <Text style={styles.note}>Minute {index + 1}{item.twoBells ? ' · two bells' : ''}</Text>
+        <Text style={styles.note}>Minute {index + 1}{item.twoBells ? ' · both bells' : ''}</Text>
       </View>
       <View style={{ alignItems: 'flex-end', gap: 2 }}>
         <Text style={styles.mono}>{repsLabel(item)}</Text>
-        {kg ? (
-          <Row style={{ gap: 6 }}>
-            <Bell kg={kg} size={12} />
-            <Text style={[styles.mono, { color: colors.muted, fontSize: 12 }]}>{kg} kg</Text>
-          </Row>
-        ) : (
-          <Text style={[styles.mono, { color: colors.muted, fontSize: 12 }]}>bodyweight</Text>
-        )}
       </View>
     </Pressable>
   );
@@ -46,8 +39,13 @@ function ItemRow({ item, index, weights }: { item: WorkoutItem; index: number; w
 
 export default function Routine() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { weights } = useBells();
+  const params = useLocalSearchParams<{ kg?: string }>();
+  const { owned, level } = useBells();
   const w = getWorkout(id ?? '');
+  const options = w ? usableWeights(w, owned) : [];
+  const [bell, setBell] = useState<number | undefined>(() =>
+    params.kg && options.includes(Number(params.kg)) ? Number(params.kg) : defaultBell(options, level),
+  );
 
   if (!w) {
     return (
@@ -59,7 +57,8 @@ export default function Routine() {
     );
   }
 
-  const t = totals(w, weights);
+  const pair = needsPair(w);
+  const t = totals(w, bell ?? 0);
   const rounds = w.minutes / w.items.length;
 
   return (
@@ -71,12 +70,16 @@ export default function Routine() {
               label="Shuffle"
               variant="secondary"
               onPress={() => {
-                const next = generateWorkout({ group: w.group as Group, minutes: w.minutes, goal: w.goal ?? 'Strength' });
-                router.setParams({ id: next.id });
+                const next = generateWorkout({ group: w.group as Group, minutes: w.minutes, goal: w.goal ?? 'Strength', pair });
+                router.setParams({ id: next.id, kg: bell ? String(bell) : undefined });
               }}
             />
           ) : null}
-          <Button label="Start workout" onPress={() => router.push({ pathname: '/workout', params: { id: w.id } })} />
+          <Button
+            label={bell ? `Start with ${pair ? '2 × ' : ''}${bell} kg` : 'Pick a bell first'}
+            variant={bell ? 'primary' : 'secondary'}
+            onPress={() => bell && router.push({ pathname: '/workout', params: { id: w.id, kg: String(bell) } })}
+          />
         </Row>
       }
     >
@@ -108,9 +111,50 @@ export default function Routine() {
         </Text>
       </View>
 
+      <View style={styles.bellBox}>
+        <Eyebrow>{pair ? 'Your pair of bells' : 'Your bell'}</Eyebrow>
+        {options.length ? (
+          <>
+            <View style={styles.bellRow}>
+              {options.map((kg) => {
+                const on = kg === bell;
+                return (
+                  <Pressable
+                    key={kg}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: on }}
+                    accessibilityLabel={`${pair ? 'Two' : 'One'} ${kg} kilogram ${pair ? 'bells' : 'bell'}`}
+                    onPress={() => setBell(kg)}
+                    style={[styles.bellChip, { borderColor: on ? bellColor(kg) : colors.surface2 }]}
+                  >
+                    <Row style={{ gap: 2 }}>
+                      <Bell kg={kg} size={22} filled={on} />
+                      {pair ? <Bell kg={kg} size={22} filled={on} /> : null}
+                    </Row>
+                    <Text style={[styles.mono, { color: on ? colors.text : colors.muted }]}>{kg} kg</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={styles.note}>
+              {pair
+                ? 'Some exercises use both bells, the rest use one of them. Same weight for the whole workout.'
+                : 'The whole workout uses this one bell. Pick a heavier one when it feels easy.'}
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.note}>
+              {pair ? 'This workout needs two bells of the same weight, and you don’t have a pair yet.' : 'Add your bells first.'}
+            </Text>
+            <Button label="Edit my bells" variant="secondary" height={44} onPress={() => router.push('/onboarding/bells')} />
+          </>
+        )}
+      </View>
+
       <View>
         {w.items.map((item, i) => (
-          <ItemRow key={`${item.exerciseId}-${i}`} item={item} index={i} weights={weights} />
+          <ItemRow key={`${item.exerciseId}-${i}`} item={item} index={i} bell={bell} />
         ))}
       </View>
 
@@ -134,6 +178,9 @@ const styles = themedStyles(() =>
     mono: { fontFamily: fonts.mono, fontSize: 13, color: colors.text },
     how: { flexDirection: 'row', gap: 10, padding: 12, borderRadius: 12, backgroundColor: colors.surface },
     howText: { flex: 1, fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.muted },
+    bellBox: { gap: 10, padding: 14, borderRadius: 14, backgroundColor: colors.surface },
+    bellRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    bellChip: { minWidth: 72, height: 64, borderRadius: 12, borderWidth: 2, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 10 },
     totals: { flexDirection: 'row', justifyContent: 'space-between', padding: 14, borderRadius: 12, backgroundColor: colors.surface },
   }),
 );

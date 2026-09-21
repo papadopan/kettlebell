@@ -1,10 +1,10 @@
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { KgTag } from '@/components/Bell';
+import { Bell } from '@/components/Bell';
 import { Body, Button, Card, Chip, Eyebrow, IconButton, Row, Screen, Title } from '@/components/ui';
 import { levelLabel } from '@/data/labels';
-import { exerciseName, GROUPS, loadFor, repsLabel, Workout, workouts } from '@/data/workouts';
+import { defaultBell, exerciseName, GROUPS, repsLabel, usableWeights, Workout, workouts } from '@/data/workouts';
 import { Level, useBells } from '@/store/bells';
 import { useTheme } from '@/store/theme';
 import { colors, fonts, themedStyles } from '@/theme';
@@ -15,16 +15,20 @@ const STATS = [
   { value: '12', label: 'day streak' },
 ];
 
-/** Suggest a full-body workout that matches the level chosen during onboarding. */
-function suggestion(level: Level): Workout {
+/** Suggest a full-body workout for the user's level that works with the bells they own. */
+function suggestion(level: Level, owned: Record<number, number>): Workout {
   const wanted = level === 'new' ? 'beginner' : level === 'some' ? 'intermediate' : 'advanced';
-  return workouts.find((w) => w.group === 'full' && w.level === wanted) ?? workouts[0];
+  const doable = workouts.filter((w) => usableWeights(w, owned).length > 0);
+  return (
+    doable.find((w) => w.group === 'full' && w.level === wanted) ?? doable.find((w) => w.group === 'full') ?? doable[0] ?? workouts[0]
+  );
 }
 
 export default function Today() {
-  const { weights, level } = useBells();
+  const { owned, level } = useBells();
   const { mode, toggle } = useTheme();
-  const w = suggestion(level);
+  const w = suggestion(level, owned);
+  const bell = defaultBell(usableWeights(w, owned), level);
 
   return (
     <Screen inTabs>
@@ -53,9 +57,13 @@ export default function Today() {
         <Eyebrow color={colors.goText}>Suggested for today</Eyebrow>
         <Text style={styles.cardTitle}>{w.name}</Text>
         <Row style={{ justifyContent: 'space-between' }}>
-          <Body muted style={{ fontSize: 14, flex: 1 }}>
-            {w.minutes} min · {levelLabel(w.level)} · uses your {weights.join(', ')} kg bells
-          </Body>
+          <Row style={{ gap: 8, flex: 1 }}>
+            {bell ? <Bell kg={bell} size={22} /> : null}
+            <Body muted style={{ fontSize: 14, flex: 1 }}>
+              {w.minutes} min · {levelLabel(w.level)}
+              {bell ? ` · one ${bell} kg bell` : ''}
+            </Body>
+          </Row>
           <Pressable accessibilityRole="button" hitSlop={10} onPress={() => router.push('/onboarding/bells')}>
             <Text style={styles.link}>Edit bells</Text>
           </Pressable>
@@ -64,15 +72,15 @@ export default function Today() {
           {w.items.map((item, i) => (
             <Row key={`${item.exerciseId}-${i}`} style={{ justifyContent: 'space-between' }}>
               <Body style={{ fontSize: 14, flex: 1 }} numberOfLines={1}>
-                {exerciseName(item.exerciseId)} · {repsLabel(item)}
+                {exerciseName(item.exerciseId)}
               </Body>
-              {loadFor(item.load, weights) ? <KgTag kg={loadFor(item.load, weights)} /> : null}
+              <Text style={styles.reps}>{repsLabel(item)}</Text>
             </Row>
           ))}
         </View>
         <Row>
           <Button label="More workouts" variant="secondary" onPress={() => router.navigate('/(tabs)/workouts')} />
-          <Button label="Start" onPress={() => router.push({ pathname: '/routine', params: { id: w.id } })} />
+          <Button label="Start" onPress={() => router.push({ pathname: '/routine', params: bell ? { id: w.id, kg: String(bell) } : { id: w.id } })} />
         </Row>
       </Card>
 
@@ -96,6 +104,7 @@ const styles = themedStyles(() =>
     statLabel: { fontFamily: fonts.body, fontSize: 12, color: colors.muted },
     cardTitle: { fontFamily: fonts.displayBold, fontSize: 30, lineHeight: 30, color: colors.text, textTransform: 'uppercase' },
     lines: { gap: 8, paddingVertical: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.line },
+    reps: { fontFamily: fonts.mono, fontSize: 13, color: colors.text },
     link: { fontFamily: fonts.body, fontSize: 13, color: colors.goText },
     groups: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   }),
