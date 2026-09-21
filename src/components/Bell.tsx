@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-import { bellColor, colors, fonts } from '@/theme';
+import { bellColor, colors, fonts, themedStyles } from '@/theme';
 
 type Props = {
   kg?: number;
@@ -31,8 +31,10 @@ export function KgTag({ kg }: { kg: number }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() =>
+  StyleSheet.create({
   tag: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 10, height: 10, borderRadius: 5 },
   tagText: { fontFamily: fonts.mono, fontSize: 13, color: colors.text },
-});
+}),
+);

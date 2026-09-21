@@ -4,7 +4,7 @@ import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
 import { Bell } from '@/components/Bell';
 import { Body, Button, Card, Chip, Eyebrow, IconButton, ProgressBar, Row, Screen, Title } from '@/components/ui';
-import { bellColor, colors, fonts } from '@/theme';
+import { bellColor, colors, fonts, themedStyles } from '@/theme';
 
 const FEEL = ['Easy', 'About right', 'Hard'];
 
@@ -27,7 +27,7 @@ export default function Summary() {
     <Screen footer={<Button label="Save to log" onPress={() => router.dismissAll()} />}>
       <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 20 }}>
         <View style={{ gap: 6 }}>
-          <Eyebrow color={colors.go}>Session complete</Eyebrow>
+          <Eyebrow color={colors.goText}>Session complete</Eyebrow>
           <Title size={48}>Nice work</Title>
           <Body muted style={{ fontSize: 14 }}>
             EMOM {p.minutes} · Strength · {today}
@@ -90,7 +90,8 @@ export default function Summary() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() =>
+  StyleSheet.create({
   grid: { gap: 6 },
   stat: { flex: 1, backgroundColor: colors.surface, borderRadius: 14, padding: 12, gap: 2 },
   statValue: { fontFamily: fonts.displayBold, fontSize: 34, lineHeight: 36, color: colors.text },
@@ -98,5 +99,6 @@ const styles = StyleSheet.create({
   mono: { fontFamily: fonts.mono, fontSize: 12 },
   strong: { fontFamily: fonts.bodySemi, fontSize: 15, color: colors.text },
   nextBell: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 18, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
-  link: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.go },
-});
+  link: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.goText },
+}),
+);

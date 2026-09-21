@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Bell } from '@/components/Bell';
 import { BackLink, Button, Chip, Eyebrow, Screen, Title } from '@/components/ui';
 import { useBells } from '@/store/bells';
-import { bellColor, colors, fonts } from '@/theme';
+import { bellColor, colors, fonts, themedStyles } from '@/theme';
 
 const TIMES = [10, 20, 30, 45];
 const GOALS = [
@@ -94,7 +94,8 @@ export default function Generator() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() =>
+  StyleSheet.create({
   section: { gap: 10 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   goalHint: { fontFamily: fonts.body, fontSize: 12, color: colors.muted },
@@ -104,4 +105,5 @@ const styles = StyleSheet.create({
   addLabel: { fontSize: 20, color: colors.muted },
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, backgroundColor: colors.surface },
   toggleTitle: { fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.text },
-});
+}),
+);

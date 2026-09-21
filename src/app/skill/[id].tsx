@@ -5,7 +5,7 @@ import { Bell } from '@/components/Bell';
 import { Icon } from '@/components/Icon';
 import { BackLink, Body, Button, Card, Eyebrow, ProgressBar, Row, Screen, Title } from '@/components/ui';
 import { findSkill, skillDetails } from '@/data/mock';
-import { bellColor, colors, fonts } from '@/theme';
+import { bellColor, colors, fonts, themedStyles } from '@/theme';
 
 function PhotoSlot({ label }: { label: string }) {
   return (
@@ -92,10 +92,12 @@ export default function SkillScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() =>
+  StyleSheet.create({
   photo: { flex: 1, height: 190, borderRadius: 14, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center', gap: 8 },
   photoLabel: { fontFamily: fonts.body, fontSize: 12, color: colors.dim },
   label: { fontFamily: fonts.body, fontSize: 13, color: colors.muted },
   mono: { fontFamily: fonts.mono, fontSize: 14, color: colors.text },
   needs: { paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.line },
-});
+}),
+);

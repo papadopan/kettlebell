@@ -5,7 +5,7 @@ import { Bell } from '@/components/Bell';
 import { Icon, IconName } from '@/components/Icon';
 import { Steps } from '@/components/Steps';
 import { Body, Button, Eyebrow, Screen, Title } from '@/components/ui';
-import { colors, fonts } from '@/theme';
+import { colors, fonts, themedStyles } from '@/theme';
 
 const POINTS: { icon: IconName; title: string; text: string }[] = [
   { icon: 'today', title: 'Routines for your bells', text: 'Every workout uses the kettlebells you actually own.' },
@@ -25,7 +25,7 @@ export default function Welcome() {
         ))}
       </View>
       <View style={{ gap: 10 }}>
-        <Eyebrow color={colors.go}>Welcome to Kettlebelt</Eyebrow>
+        <Eyebrow color={colors.goText}>Welcome to Kettlebelt</Eyebrow>
         <Title size={46}>Train the bell, not the feed</Title>
         <Body muted>Three quick questions and we’ll build your first routine.</Body>
       </View>
@@ -46,10 +46,12 @@ export default function Welcome() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() =>
+  StyleSheet.create({
   hero: { flexDirection: 'row', justifyContent: 'center', gap: 14, paddingVertical: 12 },
   point: { flexDirection: 'row', gap: 14, alignItems: 'center' },
   iconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   pointTitle: { fontFamily: fonts.bodySemi, fontSize: 15, color: colors.text },
   pointText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.muted },
-});
+}),
+);

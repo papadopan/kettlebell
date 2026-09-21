@@ -4,7 +4,7 @@ import { Share, StyleSheet, Text, View } from 'react-native';
 import { Bell } from '@/components/Bell';
 import { BackLink, Body, Button, Eyebrow, IconButton, Row, Screen, Title } from '@/components/ui';
 import { emom, emomTotals, ExerciseLine, warmup } from '@/data/mock';
-import { colors, fonts } from '@/theme';
+import { colors, fonts, themedStyles } from '@/theme';
 
 function Line({ e }: { e: ExerciseLine }) {
   return (
@@ -61,7 +61,7 @@ export default function Routine() {
         />
       </Row>
       <View style={{ gap: 6 }}>
-        <Eyebrow color={colors.go}>Generated · {minutes + 4} min total</Eyebrow>
+        <Eyebrow color={colors.goText}>Generated · {minutes + 4} min total</Eyebrow>
         <Title>{title}</Title>
       </View>
       <Body muted style={{ fontSize: 14 }}>
@@ -86,11 +86,13 @@ export default function Routine() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() =>
+  StyleSheet.create({
   line: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.line },
   name: { fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.text },
   note: { fontFamily: fonts.body, fontSize: 12, color: colors.muted },
   mono: { fontFamily: fonts.mono, fontSize: 13, color: colors.text },
   blockTitle: { fontFamily: fonts.displayBold, fontSize: 20, color: colors.text, textTransform: 'uppercase' },
   totals: { flexDirection: 'row', justifyContent: 'space-between', padding: 14, borderRadius: 12, backgroundColor: colors.surface },
-});
+}),
+);

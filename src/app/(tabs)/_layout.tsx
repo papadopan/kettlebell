@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, IconName } from '@/components/Icon';
 import { tap } from '@/components/ui';
-import { colors, fonts } from '@/theme';
+import { colors, fonts, themedStyles } from '@/theme';
 
 const TABS: Record<string, { label: string; icon: IconName }> = {
   index: { label: 'Today', icon: 'today' },
@@ -54,8 +54,10 @@ export default function TabsLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() =>
+  StyleSheet.create({
   bar: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: colors.line, backgroundColor: colors.bg, paddingTop: 8 },
   item: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4, minHeight: 48 },
   label: { fontFamily: fonts.bodyMedium, fontSize: 11 },
-});
+}),
+);

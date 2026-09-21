@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { colors, fonts, space } from '@/theme';
+import { colors, fonts, space, themedStyles } from '@/theme';
 import { Icon, IconName } from './Icon';
 
 export function tap() {
@@ -149,7 +149,8 @@ export function Row({ children, style }: { children: ReactNode; style?: StylePro
   return <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, style]}>{children}</View>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() =>
+  StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { paddingHorizontal: space.gutter, paddingTop: 12, paddingBottom: 24, gap: 18 },
   footer: { paddingHorizontal: space.gutter, paddingTop: 8, paddingBottom: 12, gap: 8 },
@@ -176,4 +177,5 @@ const styles = StyleSheet.create({
   back: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 44, alignSelf: 'flex-start' },
   backLabel: { fontFamily: fonts.body, fontSize: 14, color: colors.muted },
   iconButton: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-});
+}),
+);

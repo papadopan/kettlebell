@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { Body, Button, Card, Eyebrow, Screen, Title } from '@/components/ui';
 import { useBells } from '@/store/bells';
 import { recentSessions } from '@/data/mock';
-import { colors, fonts } from '@/theme';
+import { colors, fonts, themedStyles } from '@/theme';
 
 export default function Log() {
   const { reset } = useBells();
@@ -42,7 +42,9 @@ export default function Log() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() =>
+  StyleSheet.create({
   title: { fontFamily: fonts.displayBold, fontSize: 24, color: colors.text },
   meta: { fontFamily: fonts.mono, fontSize: 13, color: colors.muted },
-});
+}),
+);

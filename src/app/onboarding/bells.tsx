@@ -6,7 +6,7 @@ import { Icon } from '@/components/Icon';
 import { Steps } from '@/components/Steps';
 import { BackLink, Body, Button, Screen, tap, Title } from '@/components/ui';
 import { BELL_WEIGHTS, useBells } from '@/store/bells';
-import { bellColor, colors, fonts } from '@/theme';
+import { bellColor, colors, fonts, themedStyles } from '@/theme';
 
 export default function Onboarding() {
   const { owned, cycle, rack, onboarded } = useBells();
@@ -81,7 +81,8 @@ export default function Onboarding() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() =>
+  StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   cell: {
     height: 104,
@@ -99,4 +100,5 @@ const styles = StyleSheet.create({
   otherLabel: { fontFamily: fonts.bodyMedium, fontSize: 14, color: colors.muted },
   summary: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 12, backgroundColor: colors.surface },
   summaryText: { flex: 1, fontFamily: fonts.body, fontSize: 13, color: colors.muted },
-});
+}),
+);

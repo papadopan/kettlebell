@@ -5,7 +5,8 @@ import { Bell, KgTag } from '@/components/Bell';
 import { Body, Button, Card, Eyebrow, IconButton, ProgressBar, Row, Screen, Title } from '@/components/ui';
 import { emom, skillDetails } from '@/data/mock';
 import { useBells } from '@/store/bells';
-import { colors, fonts } from '@/theme';
+import { useTheme } from '@/store/theme';
+import { colors, fonts, themedStyles } from '@/theme';
 
 const STATS = [
   { value: '3', label: 'sessions this week' },
@@ -15,6 +16,7 @@ const STATS = [
 
 export default function Today() {
   const { weights } = useBells();
+  const { mode, toggle } = useTheme();
   const clean = skillDetails.clean;
 
   return (
@@ -24,7 +26,11 @@ export default function Today() {
           <Eyebrow>Tuesday · week 3</Eyebrow>
           <Title>Good morning</Title>
         </View>
-        <IconButton icon="settings" label="Edit my bells" onPress={() => router.push('/onboarding/bells')} />
+        <IconButton
+          icon={mode === 'dark' ? 'sun' : 'moon'}
+          label={mode === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          onPress={toggle}
+        />
       </Row>
 
       <Row style={{ alignItems: 'stretch' }}>
@@ -37,11 +43,16 @@ export default function Today() {
       </Row>
 
       <Card>
-        <Eyebrow color={colors.go}>Suggested for today</Eyebrow>
+        <Eyebrow color={colors.goText}>Suggested for today</Eyebrow>
         <Text style={styles.cardTitle}>EMOM 20 · Strength</Text>
-        <Body muted style={{ fontSize: 14 }}>
-          20 min · uses your {weights.length ? weights.join(', ') + ' kg' : ''} bells
-        </Body>
+        <Row style={{ justifyContent: 'space-between' }}>
+          <Body muted style={{ fontSize: 14, flex: 1 }}>
+            20 min · uses your {weights.length ? weights.join(', ') + ' kg' : ''} bells
+          </Body>
+          <Pressable accessibilityRole="button" hitSlop={10} onPress={() => router.push('/onboarding/bells')}>
+            <Text style={styles.open}>Edit bells</Text>
+          </Pressable>
+        </Row>
         <View style={styles.lines}>
           <Row style={{ justifyContent: 'space-between' }}>
             <Body style={{ fontSize: 14 }}>Odd min · one-hand swing 5/side</Body>
@@ -80,12 +91,14 @@ export default function Today() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() =>
+  StyleSheet.create({
   stat: { flex: 1, backgroundColor: colors.surface, borderRadius: 14, padding: 12, gap: 2 },
   statValue: { fontFamily: fonts.displayBold, fontSize: 28, lineHeight: 30, color: colors.text },
   statLabel: { fontFamily: fonts.body, fontSize: 12, color: colors.muted },
   cardTitle: { fontFamily: fonts.displayBold, fontSize: 30, lineHeight: 30, color: colors.text },
   lines: { gap: 8, paddingVertical: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.line },
-  open: { fontFamily: fonts.body, fontSize: 13, color: colors.go },
+  open: { fontFamily: fonts.body, fontSize: 13, color: colors.goText },
   skill: { fontFamily: fonts.bodySemi, fontSize: 16, color: colors.text },
-});
+}),
+);

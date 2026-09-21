@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Steps } from '@/components/Steps';
 import { BackLink, Body, Button, Chip, Eyebrow, Screen, tap, Title } from '@/components/ui';
 import { Level, useBells } from '@/store/bells';
-import { colors, fonts } from '@/theme';
+import { colors, fonts, themedStyles } from '@/theme';
 
 const LEVELS: { id: Level; title: string; text: string }[] = [
   { id: 'new', title: 'New to kettlebells', text: 'Start at the hinge and deadlift.' },
@@ -67,10 +67,12 @@ export default function Profile() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() =>
+  StyleSheet.create({
   option: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 16, borderWidth: 2, backgroundColor: colors.surface },
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.go },
   optionTitle: { fontFamily: fonts.bodySemi, fontSize: 16, color: colors.text },
   optionText: { fontFamily: fonts.body, fontSize: 13, color: colors.muted },
-});
+}),
+);

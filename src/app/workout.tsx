@@ -6,7 +6,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Bell, KgTag } from '@/components/Bell';
 import { IconButton, Row, Screen } from '@/components/ui';
 import { emom } from '@/data/mock';
-import { bellColor, colors, fonts } from '@/theme';
+import { bellColor, colors, fonts, themedStyles } from '@/theme';
 
 type Credit = { reps: number; kg: number };
 
@@ -148,7 +148,7 @@ export default function Workout() {
         <Text style={styles.pill}>
           Reps <Text style={{ color: colors.text }}>{reps}</Text>
         </Text>
-        <Text style={[styles.pill, { color: colors.go }]}>Offline ready</Text>
+        <Text style={[styles.pill, { color: colors.goText }]}>Offline ready</Text>
       </Row>
 
       <View style={{ marginTop: 'auto', gap: 8 }}>
@@ -180,7 +180,8 @@ export default function Workout() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() =>
+  StyleSheet.create({
   header: { fontFamily: fonts.displayBold, fontSize: 20, color: colors.text, textTransform: 'uppercase' },
   sub: { fontFamily: fonts.mono, fontSize: 12, color: colors.muted },
   seg: { flex: 1, height: 6, borderRadius: 3 },
@@ -195,4 +196,5 @@ const styles = StyleSheet.create({
   pause: { backgroundColor: colors.warn },
   nextButton: { backgroundColor: colors.surface2, borderWidth: 2, borderColor: colors.go },
   doneHint: { fontFamily: fonts.mono, fontSize: 12, color: colors.muted, marginTop: 2 },
-});
+}),
+);

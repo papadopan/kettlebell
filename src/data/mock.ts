@@ -10,6 +10,9 @@ export type Skill = {
 export type Branch = {
   id: 'ballistics' | 'getup' | 'grind';
   name: string;
+  /** One line explaining what this branch trains, shown above the steps. */
+  about: string;
+  goal: string;
   skills: Skill[];
 };
 
@@ -17,12 +20,14 @@ export const branches: Branch[] = [
   {
     id: 'ballistics',
     name: 'Ballistics',
+    about: 'Fast, hip-powered lifts where the bell floats.',
+    goal: 'Snatch',
     skills: [
       { id: 'hinge', name: 'Hinge', state: 'done', meta: 'Unlocked' },
       { id: 'deadlift', name: 'Deadlift', state: 'done', meta: 'Unlocked' },
       { id: 'two-hand-swing', name: 'Two-hand swing', state: 'done', meta: 'Unlocked' },
       { id: 'one-hand-swing', name: 'One-hand swing', state: 'done', meta: 'Unlocked 14 Sep' },
-      { id: 'clean', name: 'Clean', state: 'now', meta: '5 × 3 of 5 × 5' },
+      { id: 'clean', name: 'Clean', state: 'now', meta: 'Best 5 × 3 · goal 5 × 5 each side' },
       { id: 'high-pull', name: 'High pull', state: 'locked', meta: 'Needs Clean' },
       { id: 'snatch', name: 'Snatch', state: 'locked', meta: 'Needs High pull' },
     ],
@@ -30,10 +35,12 @@ export const branches: Branch[] = [
   {
     id: 'getup',
     name: 'Get-up',
+    about: 'From lying down to standing with the bell overhead, one step at a time.',
+    goal: 'Full Turkish get-up',
     skills: [
       { id: 'roll-to-elbow', name: 'Roll to elbow', state: 'done', meta: 'Unlocked' },
       { id: 'to-hand', name: 'To hand', state: 'done', meta: 'Unlocked' },
-      { id: 'high-bridge', name: 'High bridge', state: 'now', meta: '3 × 3 s of 3 × 5 s' },
+      { id: 'high-bridge', name: 'High bridge', state: 'now', meta: 'Best 3 s hold · goal 5 s, 3 times' },
       { id: 'leg-sweep', name: 'Leg sweep', state: 'locked', meta: 'Needs High bridge' },
       { id: 'half-kneel', name: 'Half-kneel', state: 'locked', meta: 'Needs Leg sweep' },
       { id: 'full-get-up', name: 'Full get-up', state: 'locked', meta: 'Needs Half-kneel' },
@@ -42,9 +49,11 @@ export const branches: Branch[] = [
   {
     id: 'grind',
     name: 'Grind',
+    about: 'Slow, controlled strength: squats and presses.',
+    goal: 'Double press',
     skills: [
       { id: 'goblet-squat', name: 'Goblet squat', state: 'done', meta: 'Unlocked' },
-      { id: 'rack-hold', name: 'Rack hold', state: 'now', meta: '20 s of 30 s each side' },
+      { id: 'rack-hold', name: 'Rack hold', state: 'now', meta: 'Best 20 s · goal 30 s each side' },
       { id: 'press', name: 'Press', state: 'locked', meta: 'Needs Rack hold' },
       { id: 'bottoms-up-press', name: 'Bottoms-up press', state: 'locked', meta: 'Needs Press' },
       { id: 'double-press', name: 'Double press', state: 'locked', meta: 'Needs Bottoms-up press' },

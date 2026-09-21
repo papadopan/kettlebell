@@ -13,6 +13,7 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { BellsProvider } from '@/store/bells';
+import { ThemeProvider, useTheme } from '@/store/theme';
 import { colors } from '@/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -36,19 +37,30 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <BellsProvider>
-        <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, animation: 'slide_from_right' }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
-          <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-          <Stack.Screen name="skill/[id]" />
-          <Stack.Screen name="generator" />
-          <Stack.Screen name="routine" />
-          <Stack.Screen name="workout" options={{ gestureEnabled: false, animation: 'slide_from_bottom' }} />
-          <Stack.Screen name="summary" options={{ gestureEnabled: false, animation: 'fade' }} />
-        </Stack>
-      </BellsProvider>
+      <ThemeProvider>
+        <BellsProvider>
+          <AppStack />
+        </BellsProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
+  );
+}
+
+function AppStack() {
+  const { mode } = useTheme();
+  return (
+    <>
+      <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, animation: 'slide_from_right' }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
+        <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+        <Stack.Screen name="skill/[id]" />
+        <Stack.Screen name="generator" />
+        <Stack.Screen name="routine" />
+        <Stack.Screen name="workout" options={{ gestureEnabled: false, animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="summary" options={{ gestureEnabled: false, animation: 'fade' }} />
+      </Stack>
+    </>
   );
 }
