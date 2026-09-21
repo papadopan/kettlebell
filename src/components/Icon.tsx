@@ -16,6 +16,7 @@ export type IconName =
   | 'lock'
   | 'today'
   | 'path'
+  | 'workouts'
   | 'library'
   | 'log';
 
@@ -79,6 +80,14 @@ export function Icon({ name, size = 20, color = colors.text, strokeWidth = 2 }: 
           <Circle cx={18} cy={12} r={2.5} {...p} />
           <Circle cx={6} cy={18} r={2.5} {...p} />
           <Path d="M8.3 7.2l7.4 3.6M15.7 13.2l-7.4 3.6" {...p} />
+        </>
+      )}
+      {name === 'workouts' && (
+        <>
+          <Path d="M9 6h11M9 12h11M9 18h11" {...p} />
+          <Circle cx={4.5} cy={6} r={1.2} {...p} />
+          <Circle cx={4.5} cy={12} r={1.2} {...p} />
+          <Circle cx={4.5} cy={18} r={1.2} {...p} />
         </>
       )}
       {name === 'library' && (

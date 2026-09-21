@@ -7,8 +7,8 @@ import { Level, useBells } from '@/store/bells';
 import { colors, fonts, themedStyles } from '@/theme';
 
 const LEVELS: { id: Level; title: string; text: string }[] = [
-  { id: 'new', title: 'New to kettlebells', text: 'Start at the hinge and deadlift.' },
-  { id: 'some', title: 'I can swing', text: 'Start with one-hand swings and the clean.' },
+  { id: 'new', title: 'New to kettlebells', text: 'Start with swings, squats and deadlifts.' },
+  { id: 'some', title: 'I know the basics', text: 'Swings and squats are fine; I want more variety.' },
   { id: 'experienced', title: 'Experienced', text: 'Clean, press and snatch are already in my toolbox.' },
 ];
 
@@ -25,8 +25,8 @@ export default function Profile() {
       <BackLink label="Bells" />
       <Steps step={3} />
       <View style={{ gap: 10 }}>
-        <Title size={44}>Where do you start?</Title>
-        <Body muted>This sets your starting point on Bell Path. You can change it later.</Body>
+        <Title size={44}>What’s your level?</Title>
+        <Body muted>We use this to suggest workouts at the right level. You can change it later.</Body>
       </View>
 
       <View style={{ gap: 10 }}>

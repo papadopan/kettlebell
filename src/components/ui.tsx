@@ -57,8 +57,22 @@ export function Title({ children, size = 40, style }: { children: ReactNode; siz
   );
 }
 
-export function Body({ children, muted, style }: { children: ReactNode; muted?: boolean; style?: StyleProp<TextStyle> }) {
-  return <Text style={[styles.body, muted && { color: colors.muted }, style]}>{children}</Text>;
+export function Body({
+  children,
+  muted,
+  style,
+  numberOfLines,
+}: {
+  children: ReactNode;
+  muted?: boolean;
+  style?: StyleProp<TextStyle>;
+  numberOfLines?: number;
+}) {
+  return (
+    <Text numberOfLines={numberOfLines} style={[styles.body, muted && { color: colors.muted }, style]}>
+      {children}
+    </Text>
+  );
 }
 
 export function Mono({ children, style }: { children: ReactNode; style?: StyleProp<TextStyle> }) {

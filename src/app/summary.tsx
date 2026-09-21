@@ -3,13 +3,13 @@ import { useState } from 'react';
 import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
 import { Bell } from '@/components/Bell';
-import { Body, Button, Card, Chip, Eyebrow, IconButton, ProgressBar, Row, Screen, Title } from '@/components/ui';
+import { Body, Button, Chip, Eyebrow, IconButton, Row, Screen, Title } from '@/components/ui';
 import { bellColor, colors, fonts, themedStyles } from '@/theme';
 
 const FEEL = ['Easy', 'About right', 'Hard'];
 
 export default function Summary() {
-  const p = useLocalSearchParams<{ minutes?: string; rounds?: string; reps?: string; kg?: string; seconds?: string }>();
+  const p = useLocalSearchParams<{ name?: string; minutes?: string; rounds?: string; reps?: string; kg?: string; seconds?: string }>();
   const [feel, setFeel] = useState('About right');
   const seconds = Number(p.seconds ?? 0);
   const time = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
@@ -30,7 +30,7 @@ export default function Summary() {
           <Eyebrow color={colors.goText}>Session complete</Eyebrow>
           <Title size={48}>Nice work</Title>
           <Body muted style={{ fontSize: 14 }}>
-            EMOM {p.minutes} · Strength · {today}
+            {p.name ?? 'Workout'} · {p.minutes} min · {today}
           </Body>
         </View>
         <IconButton
@@ -53,17 +53,6 @@ export default function Summary() {
         ))}
       </View>
 
-      <Card style={{ padding: 16, gap: 8 }}>
-        <Row style={{ justifyContent: 'space-between' }}>
-          <Eyebrow>Bell Path</Eyebrow>
-          <Text style={[styles.mono, { color: bellColor(16) }]}>+1 rep</Text>
-        </Row>
-        <Text style={styles.strong}>Clean: new best 5 × 4 each side</Text>
-        <ProgressBar value={0.8} color={bellColor(16)} />
-        <Body muted style={{ fontSize: 12 }}>
-          One more session like this unlocks the High pull.
-        </Body>
-      </Card>
 
       <View style={styles.nextBell}>
         <Bell kg={24} size={44} />

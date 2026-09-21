@@ -242,6 +242,27 @@ export const exercises: Exercise[] = [
     ]
   },
   {
+    "sourceName": "",
+    "mechanic": "isolation",
+    "images": [],
+    "id": "kb-biceps-curl",
+    "name": "Biceps curl",
+    "pattern": "pull",
+    "level": "beginner",
+    "primary": [
+      "biceps"
+    ],
+    "secondary": [
+      "forearms"
+    ],
+    "instructions": [
+      "Hold a bell by the handle, arm straight at your side, palm facing forward.",
+      "Keep the elbow pinned to your ribs and curl the bell up to the shoulder.",
+      "Squeeze at the top, then lower slowly until the arm is straight.",
+      "Do all reps on one side, then switch."
+    ]
+  },
+  {
     "id": "Bottoms-Up_Clean_From_The_Hang_Position",
     "name": "Bottoms-up clean from the hang position",
     "sourceName": "Bottoms-Up Clean From The Hang Position",
@@ -618,6 +639,26 @@ export const exercises: Exercise[] = [
       "Alternate the direction of the circle on each repetition. Keep your head, hips and lower back still throughout; if your lower back arches or you cannot reach the overhead position without leaning back, use a lighter weight or perform the halo and the extension as separate exercises."
     ],
     "images": []
+  },
+  {
+    "sourceName": "",
+    "mechanic": "isolation",
+    "images": [],
+    "id": "kb-hammer-curl",
+    "name": "Hammer curl",
+    "pattern": "pull",
+    "level": "beginner",
+    "primary": [
+      "biceps"
+    ],
+    "secondary": [
+      "forearms"
+    ],
+    "instructions": [
+      "Hold a bell by the horns or handle with your palm facing your body.",
+      "Keep the elbow still and curl the bell up toward the shoulder.",
+      "Lower under control without swinging the body."
+    ]
   },
   {
     "id": "Kettlebell_Hang_Clean",

@@ -8,7 +8,10 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.papadopan.kettlebelt"
+      "bundleIdentifier": "com.papadopan.kettlebelt",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -31,12 +34,18 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#141719",
-          "image": "./assets/icon.png",
-          "imageWidth": 120
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160
         }
       ]
     ],
     "scheme": "kettlebelt",
-    "backgroundColor": "#141719"
+    "backgroundColor": "#141719",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "35d04ac8-bef0-456d-8216-70a3c072cf28"
+      }
+    }
   }
 }

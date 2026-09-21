@@ -8,8 +8,8 @@ import { Body, Button, Eyebrow, Screen, Title } from '@/components/ui';
 import { colors, fonts, themedStyles } from '@/theme';
 
 const POINTS: { icon: IconName; title: string; text: string }[] = [
-  { icon: 'today', title: 'Routines for your bells', text: 'Every workout uses the kettlebells you actually own.' },
-  { icon: 'path', title: 'Bell Path', text: 'Unlock skills step by step, from the swing to the snatch.' },
+  { icon: 'today', title: 'Build your own', text: 'Choose time and goal; every workout uses the bells you own.' },
+  { icon: 'workouts', title: 'Ready-made workouts', text: 'Pick one by body part: arms, chest, back, core or legs.' },
   { icon: 'log', title: 'Your log, free forever', text: 'Every rep and kilo saved. Works offline on the gym floor.' },
 ];
 

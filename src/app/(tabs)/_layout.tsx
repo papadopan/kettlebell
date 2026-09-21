@@ -8,7 +8,7 @@ import { colors, fonts, themedStyles } from '@/theme';
 
 const TABS: Record<string, { label: string; icon: IconName }> = {
   index: { label: 'Today', icon: 'today' },
-  path: { label: 'Path', icon: 'path' },
+  workouts: { label: 'Workouts', icon: 'workouts' },
   library: { label: 'Library', icon: 'library' },
   log: { label: 'Log', icon: 'log' },
 };
@@ -47,7 +47,7 @@ export default function TabsLayout() {
   return (
     <Tabs tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.bg } }}>
       <Tabs.Screen name="index" />
-      <Tabs.Screen name="path" />
+      <Tabs.Screen name="workouts" />
       <Tabs.Screen name="library" />
       <Tabs.Screen name="log" />
     </Tabs>
