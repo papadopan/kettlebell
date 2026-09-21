@@ -141,21 +141,6 @@ export function emomTotals(minutes: number, oddKg = emom.odd.kg, evenKg = emom.e
   return { reps, kg };
 }
 
-export const library = [
-  { name: 'Goblet squat', pattern: 'Squat', kg: 16 },
-  { name: 'Halo', pattern: 'Mobility', kg: 12 },
-  { name: 'Two-hand swing', pattern: 'Hinge', kg: 20 },
-  { name: 'One-hand swing', pattern: 'Hinge', kg: 20 },
-  { name: 'Clean', pattern: 'Hinge', kg: 16 },
-  { name: 'Snatch', pattern: 'Hinge', kg: 16 },
-  { name: 'Press', pattern: 'Push', kg: 12 },
-  { name: 'Turkish get-up', pattern: 'Get-up', kg: 12 },
-  { name: 'Windmill', pattern: 'Mobility', kg: 12 },
-  { name: 'Renegade row', pattern: 'Pull', kg: 16 },
-  { name: 'Front squat, two bells', pattern: 'Squat', kg: 16 },
-  { name: 'Figure 8', pattern: 'Conditioning', kg: 12 },
-];
-
 export const recentSessions = [
   { date: 'Sun 20 Sep', title: 'Ladder · Press', minutes: 18, kg: 1180 },
   { date: 'Fri 18 Sep', title: 'EMOM 20 · Strength', minutes: 24, kg: 2960 },

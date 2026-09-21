@@ -56,6 +56,7 @@ function AppStack() {
         <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="skill/[id]" />
+        <Stack.Screen name="exercise/[id]" />
         <Stack.Screen name="generator" />
         <Stack.Screen name="routine" />
         <Stack.Screen name="workout" options={{ gestureEnabled: false, animation: 'slide_from_bottom' }} />
