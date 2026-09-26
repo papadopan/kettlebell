@@ -7,11 +7,11 @@ import { Icon } from '@/components/Icon';
 import { BackLink, Body, Button, Eyebrow, IconButton, Row, Screen, Title } from '@/components/ui';
 import { findExercise } from '@/data/exercises';
 import { levelLabel } from '@/data/labels';
-import { defaultBell, exerciseName, generateWorkout, getWorkout, Group, groupLabel, needsPair, repsLabel, totals, usableWeights, WorkoutItem } from '@/data/workouts';
+import { defaultBell, exerciseName, FORMATS, formatLabel, generateWorkout, getWorkout, Group, groupLabel, needsPair, repsLabel, totals, usableWeights, WorkoutItem } from '@/data/workouts';
 import { useBells } from '@/store/bells';
 import { bellColor, colors, fonts, themedStyles } from '@/theme';
 
-function ItemRow({ item, index, bell }: { item: WorkoutItem; index: number; bell?: number }) {
+function ItemRow({ item, index, bell, emom }: { item: WorkoutItem; index: number; bell?: number; emom: boolean }) {
   const ex = findExercise(item.exerciseId);
   const kg = bell ?? 0;
   return (
@@ -28,7 +28,10 @@ function ItemRow({ item, index, bell }: { item: WorkoutItem; index: number; bell
         <Text style={styles.name} numberOfLines={1}>
           {exerciseName(item.exerciseId)}
         </Text>
-        <Text style={styles.note}>Minute {index + 1}{item.twoBells ? ' · both bells' : ''}</Text>
+        <Text style={styles.note}>
+          {emom ? `Minute ${index + 1}` : `Exercise ${index + 1}`}
+          {item.twoBells ? ' · both bells' : ''}
+        </Text>
       </View>
       <View style={{ alignItems: 'flex-end', gap: 2 }}>
         <Text style={styles.mono}>{repsLabel(item)}</Text>
@@ -85,6 +88,15 @@ export default function Routine() {
     >
       <Row style={{ justifyContent: 'space-between' }}>
         <BackLink label="Back" />
+        {w.custom ? (
+          <Button
+            label="Edit"
+            variant="secondary"
+            height={44}
+            style={{ flexGrow: 0, marginRight: 8 }}
+            onPress={() => router.push({ pathname: '/builder', params: { id: w.id } })}
+          />
+        ) : null}
         <IconButton
           icon="share"
           label="Share workout"
@@ -95,7 +107,8 @@ export default function Routine() {
       </Row>
       <View style={{ gap: 6 }}>
         <Eyebrow color={colors.goText}>
-          {groupLabel(w.group)} · {w.minutes} min · {levelLabel(w.level)}
+          {w.custom ? 'Your workout' : groupLabel(w.group)} · {formatLabel(w.format)} · {w.minutes} min
+          {w.custom ? '' : ` · ${levelLabel(w.level)}`}
         </Eyebrow>
         <Title>{w.name}</Title>
       </View>
@@ -106,8 +119,8 @@ export default function Routine() {
       <View style={styles.how}>
         <Icon name="today" size={18} color={colors.goText} />
         <Text style={styles.howText}>
-          EMOM: at the start of every minute, do the next exercise, then rest until the minute ends.
-          {Number.isInteger(rounds) ? ` ${rounds} rounds of the list below.` : ''}
+          {FORMATS.find((f) => f.id === w.format)?.help}
+          {w.format === 'emom' && Number.isInteger(rounds) ? ` ${rounds} rounds of the list below.` : ''}
         </Text>
       </View>
 
@@ -154,12 +167,12 @@ export default function Routine() {
 
       <View>
         {w.items.map((item, i) => (
-          <ItemRow key={`${item.exerciseId}-${i}`} item={item} index={i} bell={bell} />
+          <ItemRow key={`${item.exerciseId}-${i}`} item={item} index={i} bell={bell} emom={w.format === 'emom'} />
         ))}
       </View>
 
       <View style={styles.totals}>
-        <Text style={[styles.mono, { color: colors.muted }]}>Whole workout</Text>
+        <Text style={[styles.mono, { color: colors.muted }]}>{w.format === 'emom' ? 'Whole workout' : 'One round'}</Text>
         <Text style={styles.mono}>
           {t.reps} reps · {t.kg.toLocaleString('en-US')} kg
         </Text>

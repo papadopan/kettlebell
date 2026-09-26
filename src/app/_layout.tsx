@@ -14,6 +14,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { CrashScreen } from '@/components/CrashScreen';
 import { BellsProvider } from '@/store/bells';
+import { MyWorkoutsProvider } from '@/store/myWorkouts';
+import { SessionsProvider } from '@/store/sessions';
 import { ThemeProvider, useTheme } from '@/store/theme';
 import { colors } from '@/theme';
 
@@ -46,7 +48,11 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider>
         <BellsProvider>
-          <AppStack />
+          <MyWorkoutsProvider>
+            <SessionsProvider>
+              <AppStack />
+            </SessionsProvider>
+          </MyWorkoutsProvider>
         </BellsProvider>
       </ThemeProvider>
     </SafeAreaProvider>
@@ -64,6 +70,7 @@ function AppStack() {
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="exercise/[id]" />
         <Stack.Screen name="generator" />
+        <Stack.Screen name="builder" />
         <Stack.Screen name="routine" />
         <Stack.Screen name="workout" options={{ gestureEnabled: false, animation: 'slide_from_bottom' }} />
         <Stack.Screen name="summary" options={{ gestureEnabled: false, animation: 'fade' }} />

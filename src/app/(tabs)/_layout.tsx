@@ -10,7 +10,7 @@ const TABS: Record<string, { label: string; icon: IconName }> = {
   index: { label: 'Today', icon: 'today' },
   workouts: { label: 'Workouts', icon: 'workouts' },
   library: { label: 'Library', icon: 'library' },
-  log: { label: 'Log', icon: 'log' },
+  stats: { label: 'Stats', icon: 'log' },
 };
 
 function TabBar({ state, navigation }: BottomTabBarProps) {
@@ -49,7 +49,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" />
       <Tabs.Screen name="workouts" />
       <Tabs.Screen name="library" />
-      <Tabs.Screen name="log" />
+      <Tabs.Screen name="stats" />
     </Tabs>
   );
 }

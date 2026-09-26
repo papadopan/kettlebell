@@ -12,6 +12,14 @@ import { ExerciseLevel, findExercise } from './exercises';
  */
 
 export type Group = 'full' | 'arms' | 'chest' | 'back' | 'core' | 'legs';
+export type Format = 'emom' | 'amrap';
+
+export const FORMATS: { id: Format; label: string; help: string }[] = [
+  { id: 'emom', label: 'EMOM', help: 'One exercise at the start of every minute, then rest until the next.' },
+  { id: 'amrap', label: 'AMRAP', help: 'Go through the list again and again. As many rounds as possible before time runs out.' },
+];
+
+export const formatLabel = (f: Format) => FORMATS.find((x) => x.id === f)?.label ?? f;
 export type Goal = 'Strength' | 'Conditioning' | 'Mobility';
 
 export const GROUPS: { id: Group; label: string }[] = [
@@ -39,11 +47,16 @@ export type Workout = {
   name: string;
   group: Group;
   level: ExerciseLevel;
+  format: Format;
+  /** EMOM: how long it runs. AMRAP: the time cap. */
   minutes: number;
   about: string;
   items: WorkoutItem[];
   generated?: boolean;
+  /** Made by the user in the workout builder. */
+  custom?: boolean;
   goal?: Goal;
+  createdAt?: string;
 };
 
 const I = (exerciseId: string, reps: number, opts: { perSide?: boolean; twoBells?: boolean } = {}): WorkoutItem => ({
@@ -53,7 +66,7 @@ const I = (exerciseId: string, reps: number, opts: { perSide?: boolean; twoBells
 });
 const side = { perSide: true };
 
-export const workouts: Workout[] = [
+const TEMPLATES: Omit<Workout, 'format'>[] = [
   // Full body
   {
     id: 'full-foundation', name: 'Foundation', group: 'full', level: 'beginner', minutes: 20,
@@ -127,6 +140,9 @@ export const workouts: Workout[] = [
   },
 ];
 
+/** Every ready-made workout is an EMOM. */
+export const workouts: Workout[] = TEMPLATES.map((w) => ({ ...w, format: 'emom' }));
+
 // ---- Weights ----
 
 /** True when the workout has at least one two-bell exercise, so it needs a pair. */
@@ -153,9 +169,17 @@ export const kgFor = (item: WorkoutItem, bell: number) => repsFor(item) * bell *
 export const itemForMinute = (w: Workout, minute: number) => w.items[(minute - 1) % w.items.length];
 export const repsLabel = (item: WorkoutItem) => `${item.reps}${item.perSide ? ' / side' : ''}`;
 
+/** EMOM: the whole workout. AMRAP: one round (the number of rounds is up to the trainee). */
 export function totals(w: Workout, bell: number) {
   let reps = 0;
   let kg = 0;
+  if (w.format === 'amrap') {
+    for (const item of w.items) {
+      reps += repsFor(item);
+      kg += kgFor(item, bell);
+    }
+    return { reps, kg };
+  }
   for (let m = 1; m <= w.minutes; m++) {
     const item = itemForMinute(w, m);
     reps += repsFor(item);
@@ -222,9 +246,16 @@ const POOL: Record<Group, PoolEntry[]> = {
 };
 
 const generated = new Map<string, Workout>();
+const mine = new Map<string, Workout>();
+
+/** The workout builder's store calls this whenever the user's saved workouts change. */
+export function registerMyWorkouts(list: Workout[]) {
+  mine.clear();
+  for (const w of list) mine.set(w.id, w);
+}
 
 export function getWorkout(id: string): Workout | undefined {
-  return workouts.find((w) => w.id === id) ?? generated.get(id);
+  return workouts.find((w) => w.id === id) ?? mine.get(id) ?? generated.get(id);
 }
 
 function shuffle<T>(list: T[]): T[] {
@@ -249,6 +280,7 @@ export function generateWorkout(opts: { group: Group; minutes: number; goal: Goa
     twoBells: p.twoBells,
   }));
   const w: Workout = {
+    format: 'emom',
     id: `gen-${Date.now()}`,
     name: `Your ${groupLabel(opts.group).toLowerCase()} EMOM`,
     group: opts.group,

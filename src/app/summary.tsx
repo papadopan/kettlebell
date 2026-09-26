@@ -5,14 +5,16 @@ import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { Bell } from '@/components/Bell';
 import { Body, Button, Chip, Eyebrow, IconButton, Row, Screen, Title } from '@/components/ui';
 import { useBells } from '@/store/bells';
+import { useSessions } from '@/store/sessions';
 import { bellColor, colors, fonts, themedStyles } from '@/theme';
 
 const FEEL = ['Easy', 'About right', 'Hard'];
 
 export default function Summary() {
-  const p = useLocalSearchParams<{ bell?: string; name?: string; minutes?: string; rounds?: string; reps?: string; kg?: string; seconds?: string }>();
+  const p = useLocalSearchParams<{ format?: string; bell?: string; name?: string; minutes?: string; rounds?: string; reps?: string; kg?: string; seconds?: string }>();
   const [feel, setFeel] = useState('About right');
   const { weights } = useBells();
+  const { add } = useSessions();
   const bell = Number(p.bell ?? 0);
   // Progression: after an easy session suggest the next bell you own, or the next standard size if you have none heavier.
   const heavierOwned = weights.find((kg) => kg > bell);
@@ -26,11 +28,30 @@ export default function Summary() {
     { value: time, label: 'time' },
     { value: kg.toLocaleString('en-US'), label: 'kg moved' },
     { value: p.reps ?? '0', label: 'reps' },
-    { value: `${p.rounds ?? 0}/${p.minutes ?? 0}`, label: 'rounds' },
+    p.format === 'amrap'
+      ? { value: `${p.rounds ?? 0}`, label: 'rounds done' }
+      : { value: `${p.rounds ?? 0}/${p.minutes ?? 0}`, label: 'rounds' },
   ];
 
   return (
-    <Screen footer={<Button label="Save to log" onPress={() => router.dismissAll()} />}>
+    <Screen footer={<Button
+          label="Save to log"
+          onPress={() => {
+            add({
+              id: `s-${Date.now()}`,
+              date: new Date().toISOString(),
+              name: p.name ?? 'Workout',
+              format: p.format === 'amrap' ? 'amrap' : 'emom',
+              bell,
+              seconds,
+              rounds: Number(p.rounds ?? 0),
+              reps: Number(p.reps ?? 0),
+              kg,
+              feel,
+            });
+            router.dismissAll();
+          }}
+        />}>
       <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 20 }}>
         <View style={{ gap: 6 }}>
           <Eyebrow color={colors.goText}>Session complete</Eyebrow>
