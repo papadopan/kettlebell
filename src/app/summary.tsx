@@ -4,6 +4,7 @@ import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
 import { Bell } from '@/components/Bell';
 import { Body, Button, Chip, Eyebrow, IconButton, Row, Screen, Title } from '@/components/ui';
+import { Format, FORMATS, formatLabel } from '@/data/workouts';
 import { useBells } from '@/store/bells';
 import { useSessions } from '@/store/sessions';
 import { bellColor, colors, fonts, themedStyles } from '@/theme';
@@ -11,7 +12,11 @@ import { bellColor, colors, fonts, themedStyles } from '@/theme';
 const FEEL = ['Easy', 'About right', 'Hard'];
 
 export default function Summary() {
-  const p = useLocalSearchParams<{ format?: string; bell?: string; name?: string; minutes?: string; rounds?: string; reps?: string; kg?: string; seconds?: string }>();
+  const p = useLocalSearchParams<{
+    format?: string; bell?: string; name?: string; minutes?: string;
+    rounds?: string; target?: string; sets?: string; reps?: string; kg?: string; seconds?: string;
+  }>();
+  const format: Format = (FORMATS.find((f) => f.id === p.format)?.id ?? 'emom') as Format;
   const [feel, setFeel] = useState('About right');
   const { weights } = useBells();
   const { add } = useSessions();
@@ -24,13 +29,27 @@ export default function Summary() {
   const kg = Number(p.kg ?? 0);
   const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
+  const rounds = Number(p.rounds ?? 0);
+  const sets = Number(p.sets ?? 0);
+  const target = Number(p.target ?? 0);
+
+  // The fourth tile is whatever this format actually counts.
+  const scoreTile =
+    format === 'amrap' || format === 'intervals'
+      ? { value: `${rounds}`, label: 'rounds done' }
+      : format === 'fortime'
+        ? { value: `${sets}${target ? `/${target}` : ''}`, label: 'sets done' }
+        : format === 'sets'
+          ? { value: `${sets}${target ? `/${target}` : ''}`, label: 'sets done' }
+          : format === 'ladder'
+            ? { value: `${rounds}`, label: 'rungs climbed' }
+            : { value: `${rounds}${target ? `/${target}` : ''}`, label: 'minutes done' };
+
   const stats = [
-    { value: time, label: 'time' },
+    { value: time, label: format === 'fortime' ? 'your time' : 'time' },
     { value: kg.toLocaleString('en-US'), label: 'kg moved' },
     { value: p.reps ?? '0', label: 'reps' },
-    p.format === 'amrap'
-      ? { value: `${p.rounds ?? 0}`, label: 'rounds done' }
-      : { value: `${p.rounds ?? 0}/${p.minutes ?? 0}`, label: 'rounds' },
+    scoreTile,
   ];
 
   return (
@@ -41,10 +60,10 @@ export default function Summary() {
               id: `s-${Date.now()}`,
               date: new Date().toISOString(),
               name: p.name ?? 'Workout',
-              format: p.format === 'amrap' ? 'amrap' : 'emom',
+              format,
               bell,
               seconds,
-              rounds: Number(p.rounds ?? 0),
+              rounds,
               reps: Number(p.reps ?? 0),
               kg,
               feel,
@@ -57,7 +76,7 @@ export default function Summary() {
           <Eyebrow color={colors.goText}>Session complete</Eyebrow>
           <Title size={48}>Nice work</Title>
           <Body muted style={{ fontSize: 14 }}>
-            {p.name ?? 'Workout'} · {p.minutes} min · {today}
+            {p.name ?? 'Workout'} · {formatLabel(format)} · {today}
           </Body>
         </View>
         <IconButton

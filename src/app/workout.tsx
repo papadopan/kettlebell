@@ -7,146 +7,183 @@ import { Bell, KgTag } from '@/components/Bell';
 import { ExerciseDemo, ExerciseHowToSheet } from '@/components/ExerciseDemo';
 import { Icon } from '@/components/Icon';
 import { findExercise } from '@/data/exercises';
-import { exerciseName, getWorkout, itemForMinute, kgFor, repsFor, repsLabel } from '@/data/workouts';
+import {
+  clockMode, exerciseName, getWorkout, kgFor, repsFor, repsLabel, slotAt, slotCount,
+} from '@/data/workouts';
 import { IconButton, Row, Screen } from '@/components/ui';
 import { bellColor, colors, fonts, themedStyles } from '@/theme';
 
 type Credit = { reps: number; kg: number };
 
-const clock = (seconds: number) => `${Math.floor(Math.max(0, seconds) / 60)}:${String(Math.max(0, seconds) % 60).padStart(2, '0')}`;
+const clock = (seconds: number) => {
+  const s = Math.max(0, Math.round(seconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
 
+/**
+ * One player for every format. The workout is a run of slots (see the slot engine in
+ * data/workouts.ts); this screen only has to know what the clock does:
+ *
+ *   slot — each slot gets its own countdown, and running out moves you on (EMOM, intervals, ladder)
+ *   cap  — one countdown for the whole session, you move yourself on (AMRAP)
+ *   up   — counts up from zero until the work is done (For time)
+ *   none — no clock on the work at all, only a rest timer between sets (Straight sets)
+ */
 export default function Workout() {
   const params = useLocalSearchParams<{ id?: string; kg?: string }>();
   /** The one bell weight used for the whole workout. */
   const bell = Number(params.kg ?? 0);
   const plan = getWorkout(params.id ?? '');
-  const amrap = plan?.format === 'amrap';
-  const total = plan?.minutes ?? 0;
+  const mode = plan ? clockMode(plan.format) : 'slot';
+  const count = plan ? slotCount(plan) : 0;
+  const capSeconds = (plan?.minutes ?? 0) * 60;
 
-  // EMOM: one exercise per minute. AMRAP: work through the list again and again until time is up.
-  const [minute, setMinute] = useState(1);
-  const [secondsLeft, setSecondsLeft] = useState(60);
-  const [index, setIndex] = useState(0);
-  const [round, setRound] = useState(1);
+  const [n, setN] = useState(0);
+  const [slotLeft, setSlotLeft] = useState(() => (plan ? (slotAt(plan, 0).seconds ?? 0) : 0));
+  const [resting, setResting] = useState(false);
+  const [restLeft, setRestLeft] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [credits, setCredits] = useState<Record<number, Credit>>({});
-  const [done, setDone] = useState<Credit[]>([]);
+  const [logged, setLogged] = useState<Credit[]>([]);
+  const [creditedSlot, setCreditedSlot] = useState<number | null>(null);
   const [howTo, setHowTo] = useState(false);
   const elapsed = useRef(0);
-  const [tick, setTick] = useState(0);
+  const over = useRef(false);
+  const [, setTick] = useState(0);
 
-  const current = plan ? (amrap ? plan.items[index] : itemForMinute(plan, minute)) : undefined;
-  const next = plan ? (amrap ? plan.items[(index + 1) % plan.items.length] : itemForMinute(plan, minute + 1)) : undefined;
-  const currentEx = current ? findExercise(current.exerciseId) : undefined;
-  const currentKg = current ? bell : 0;
-  const nextKg = next ? bell : 0;
+  const slot = plan ? slotAt(plan, n) : undefined;
+  const nextSlot = plan && (count === undefined || n + 1 < count) ? slotAt(plan, n + 1) : undefined;
+  const currentEx = slot ? findExercise(slot.item.exerciseId) : undefined;
+  const last = count !== undefined && n >= count - 1;
 
-  const moved = amrap ? done.reduce((a, c) => a + c.kg, 0) : Object.values(credits).reduce((a, c) => a + c.kg, 0);
-  const reps = amrap ? done.reduce((a, c) => a + c.reps, 0) : Object.values(credits).reduce((a, c) => a + c.reps, 0);
-  const doneThisMinute = !amrap && !!credits[minute];
-  const timeLeft = amrap ? total * 60 - elapsed.current : secondsLeft;
+  const moved = logged.reduce((a, c) => a + c.kg, 0);
+  const reps = logged.reduce((a, c) => a + c.reps, 0);
+  const creditedNow = creditedSlot === n;
 
-  const finish = (result?: { reps: number; kg: number; rounds: number }) => {
-    const totals = result ?? {
-      reps,
-      kg: moved,
-      rounds: amrap ? round - 1 : Object.keys(credits).length,
-    };
+  const finish = (extra: Credit[] = []) => {
+    if (over.current) return;
+    over.current = true;
+    const all = [...logged, ...extra];
+    const perRound = plan?.items.length || 1;
+    // "Rounds" means whole trips through the list where that is the point, and
+    // completed sets where it is not (EMOM minutes, ladder rungs, straight sets).
+    const cycles = plan && (plan.format === 'amrap' || plan.format === 'fortime' || plan.format === 'intervals');
     router.replace({
       pathname: '/summary',
       params: {
         name: plan?.name ?? 'Workout',
         format: plan?.format ?? 'emom',
         bell: String(bell),
-        minutes: String(total),
-        rounds: String(totals.rounds),
-        reps: String(totals.reps),
-        kg: String(totals.kg),
+        minutes: String(plan?.minutes ?? 0),
+        rounds: String(cycles ? Math.floor(all.length / perRound) : all.length),
+        target: String(count ?? 0),
+        sets: String(all.length),
+        reps: String(all.reduce((a, c) => a + c.reps, 0)),
+        kg: String(all.reduce((a, c) => a + c.kg, 0)),
         seconds: String(elapsed.current),
       },
     });
   };
 
-  // One tick a second: EMOM counts the minute down, AMRAP counts up to the time cap.
+  const buzz = (type: Haptics.NotificationFeedbackType) => {
+    if (Platform.OS !== 'web') Haptics.notificationAsync(type).catch(() => {});
+  };
+
+  /** Move to the next slot, or finish if that was the last one. */
+  const goTo = (next: number, extra: Credit[] = []) => {
+    if (!plan) return;
+    if (count !== undefined && next >= count) {
+      buzz(Haptics.NotificationFeedbackType.Success);
+      finish(extra);
+      return;
+    }
+    setN(next);
+    setSlotLeft(slotAt(plan, next).seconds ?? 0);
+    setResting(false);
+    setRestLeft(0);
+  };
+
+  /** Log this slot's work, then rest if the format rests, otherwise move straight on. */
+  const completeSlot = (credit: Credit | null) => {
+    if (!plan || !slot) return;
+    const extra = credit ? [credit] : [];
+    if (credit) setLogged((list) => [...list, credit]);
+    const rest = slot.restAfter ?? 0;
+    const lastSlot = count !== undefined && n >= count - 1;
+    if (rest > 0 && !lastSlot) {
+      setResting(true);
+      setRestLeft(rest);
+      return;
+    }
+    goTo(n + 1, extra);
+  };
+
+  const creditFor = () => (slot ? { reps: repsFor(slot.item, slot.reps), kg: kgFor(slot.item, bell, slot.reps) } : null);
+
+  // One tick a second. Everything that counts is driven from here.
   useEffect(() => {
-    if (paused || !plan) return;
+    if (paused || !plan || over.current) return;
     const t = setInterval(() => {
       elapsed.current += 1;
-      if (amrap) setTick((n) => n + 1);
-      else setSecondsLeft((s) => s - 1);
+      setTick((x) => x + 1);
+      if (resting) setRestLeft((s) => s - 1);
+      else if (mode === 'slot') setSlotLeft((s) => s - 1);
     }, 1000);
     return () => clearInterval(t);
-  }, [paused, plan, amrap]);
+  }, [paused, plan, resting, mode]);
 
-  // AMRAP: stop when the time cap is reached.
+  // The rest between sets ran out: on to the next one.
   useEffect(() => {
-    if (!amrap || !plan || paused) return;
-    if (elapsed.current >= total * 60) {
-      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    if (!resting || restLeft > 0) return;
+    buzz(Haptics.NotificationFeedbackType.Warning);
+    goTo(n + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restLeft, resting]);
+
+  // A timed slot ran out. If you never tapped Done we assume you did the work and log it.
+  useEffect(() => {
+    if (mode !== 'slot' || resting || slotLeft > 0 || !plan || !slot) return;
+    buzz(Haptics.NotificationFeedbackType.Warning);
+    completeSlot(creditedNow ? null : creditFor());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slotLeft]);
+
+  // AMRAP: stop at the time cap.
+  useEffect(() => {
+    if (mode !== 'cap' || !plan || paused || over.current) return;
+    if (elapsed.current >= capSeconds) {
+      buzz(Haptics.NotificationFeedbackType.Success);
       finish();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick]);
-
-  // EMOM: the minute ran out.
-  useEffect(() => {
-    if (amrap || secondsLeft > 0) return;
-    if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-    // No Done tap: assume the set was done and log it, so the bar fills in.
-    const updated = credits[minute] || !current ? credits : { ...credits, [minute]: { reps: repsFor(current), kg: kgFor(current, bell) } };
-    if (updated !== credits) setCredits(updated);
-    if (minute >= total) {
-      finish({
-        reps: Object.values(updated).reduce((a, c) => a + c.reps, 0),
-        kg: Object.values(updated).reduce((a, c) => a + c.kg, 0),
-        rounds: Object.keys(updated).length,
-      });
-      return;
-    }
-    advance();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [secondsLeft]);
-
-  /** EMOM only: move on to the next minute's exercise. */
-  const advance = () => {
-    if (minute >= total) {
-      finish();
-      return;
-    }
-    setMinute((m) => m + 1);
-    setSecondsLeft(60);
-  };
+  });
 
   const onMainPress = () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-    if (!plan || !current) return;
+    if (!plan || !slot) return;
 
-    if (amrap) {
-      // Log the set and step to the next exercise, starting a new round after the last one.
-      setDone((list) => [...list, { reps: repsFor(current), kg: kgFor(current, bell) }]);
-      if (index >= plan.items.length - 1) {
-        setIndex(0);
-        setRound((r) => r + 1);
-      } else {
-        setIndex((i) => i + 1);
+    if (resting) {
+      // Skip the rest of the rest.
+      goTo(n + 1);
+      return;
+    }
+
+    if (mode === 'slot') {
+      if (creditedNow) {
+        // Already logged — skip the rest of the clock and start the next one now.
+        completeSlot(null);
+        return;
+      }
+      setCreditedSlot(n);
+      const credit = creditFor();
+      if (credit) setLogged((list) => [...list, credit]);
+      if (last) {
+        buzz(Haptics.NotificationFeedbackType.Success);
+        finish(credit ? [credit] : []);
       }
       return;
     }
 
-    if (doneThisMinute) {
-      // Skip the rest of this minute and start the next exercise now.
-      advance();
-      return;
-    }
-    const updated = { ...credits, [minute]: { reps: repsFor(current), kg: kgFor(current, bell) } };
-    setCredits(updated);
-    if (minute >= total) {
-      finish({
-        reps: Object.values(updated).reduce((a, c) => a + c.reps, 0),
-        kg: Object.values(updated).reduce((a, c) => a + c.kg, 0),
-        rounds: Object.keys(updated).length,
-      });
-    }
+    // Untimed work (AMRAP, For time, Straight sets): Done both logs and advances.
+    completeSlot(creditFor());
   };
 
   const togglePause = () => {
@@ -163,68 +200,88 @@ export default function Workout() {
     );
   }
 
-  const mainLabel = amrap
-    ? `Done · next ${next ? exerciseName(next.exerciseId).toLowerCase() : ''}`
-    : doneThisMinute
-      ? minute >= total
-        ? 'Finish workout'
-        : `Next: ${next ? exerciseName(next.exerciseId) : ''}`
-      : 'Done';
+  const timeShown = resting ? restLeft : mode === 'cap' ? capSeconds - elapsed.current : mode === 'up' || mode === 'none' ? elapsed.current : slotLeft;
+  const timeNote = paused
+    ? 'Paused'
+    : resting
+      ? 'rest · next set coming'
+      : mode === 'cap'
+        ? 'left · keep going'
+        : mode === 'up'
+          ? 'elapsed · go'
+          : mode === 'none'
+            ? 'elapsed'
+            : creditedNow
+              ? 'Resting'
+              : plan.format === 'intervals'
+                ? 'left · work'
+                : 'left this minute';
+
+  const stepped = resting || (mode === 'slot' && creditedNow);
+  const mainLabel = resting
+    ? 'Skip rest'
+    : last
+      ? 'Finish workout'
+      : mode === 'slot' && creditedNow
+        ? 'Next exercise'
+        : 'Done';
+  const mainHint =
+    mode !== 'slot' || !creditedNow || resting
+      ? null
+      : plan.format === 'intervals'
+        ? 'Logged · the rest starts when the clock runs out'
+        : 'Logged · or rest and the next minute starts at 0:00';
+
+  const progress = count === undefined ? Math.min(1, elapsed.current / capSeconds) : (n + (creditedNow ? 1 : 0)) / count;
 
   return (
     <Screen scroll={false}>
       <Row style={{ justifyContent: 'space-between', paddingTop: 4 }}>
         <IconButton icon="close" label="End workout" onPress={() => finish()} />
-        <View style={{ alignItems: 'center', gap: 2 }}>
+        <View style={{ flex: 1, alignItems: 'center', gap: 2, paddingHorizontal: 8 }}>
           <Text style={styles.header} numberOfLines={1}>
             {plan.name}
           </Text>
-          <Text style={styles.sub}>
-            {amrap
-              ? `Round ${round} · ${index + 1}/${plan.items.length} · ${reps} reps`
-              : `Minute ${minute} of ${total}`}
-            {' · '}
-            {moved.toLocaleString('en-US')} kg
+          <Text style={styles.sub} numberOfLines={1}>
+            {slot?.label} · {moved.toLocaleString('en-US')} kg
           </Text>
         </View>
         <View style={{ width: 44 }} />
       </Row>
 
-      {amrap ? (
-        <View style={styles.track}>
-          <View style={[styles.trackFill, { width: `${Math.min(100, (elapsed.current / (total * 60)) * 100)}%` }]} />
-        </View>
-      ) : (
+      {count !== undefined && count <= 32 ? (
         <View style={{ flexDirection: 'row', gap: 3 }}>
-          {Array.from({ length: total }, (_, i) => i + 1).map((m) => (
+          {Array.from({ length: count }, (_, i) => i).map((i) => (
             <View
-              key={m}
-              style={[styles.seg, { backgroundColor: credits[m] ? colors.go : m === minute ? colors.text : colors.surface2 }]}
+              key={i}
+              style={[styles.seg, { backgroundColor: i < n || (i === n && creditedNow) ? colors.go : i === n ? colors.text : colors.surface2 }]}
             />
           ))}
+        </View>
+      ) : (
+        <View style={styles.track}>
+          <View style={[styles.trackFill, { width: `${Math.min(100, progress * 100)}%` }]} />
         </View>
       )}
 
       <Row style={{ justifyContent: 'center', alignItems: 'baseline', gap: 12 }}>
-        <Text style={styles.timer} accessibilityLabel={`${timeLeft} seconds left`}>
-          {clock(timeLeft)}
+        <Text style={[styles.timer, resting && { color: colors.warn }]} accessibilityLabel={`${Math.max(0, timeShown)} seconds`}>
+          {clock(timeShown)}
         </Text>
-        <Text style={[styles.sub, { flexShrink: 1 }]}>
-          {paused ? 'Paused' : amrap ? 'left · keep going' : doneThisMinute ? 'Resting' : 'left this minute'}
-        </Text>
+        <Text style={[styles.sub, { flexShrink: 1 }]}>{timeNote}</Text>
       </Row>
 
-      <View style={[styles.current, { borderColor: bellColor(currentKg), opacity: doneThisMinute ? 0.6 : 1 }]}>
+      <View style={[styles.current, { borderColor: resting ? colors.warn : bellColor(bell), opacity: creditedNow && !resting ? 0.6 : 1 }]}>
         <ExerciseDemo images={currentEx?.images ?? []} height={170} showCaption={false} />
         <Row style={{ gap: 12 }}>
-          <Bell kg={currentKg} size={36} />
+          <Bell kg={bell} size={36} />
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={styles.exercise} numberOfLines={2} adjustsFontSizeToFit>
-              {current ? exerciseName(current.exerciseId) : ''}
+              {slot ? exerciseName(slot.item.exerciseId) : ''}
             </Text>
             <Text style={styles.reps}>
-              {current ? repsLabel(current).replace(' / side', ' per side') : ''}
-              {currentKg ? ` · ${current?.twoBells ? '2 × ' : ''}${currentKg} kg` : ''}
+              {slot ? repsLabel(slot.item, slot.reps).replace(' / side', ' per side') : ''}
+              {bell ? ` · ${slot?.item.twoBells ? '2 × ' : ''}${bell} kg` : ''}
             </Text>
           </View>
           <Pressable accessibilityRole="button" onPress={() => setHowTo(true)} style={styles.howBtn} hitSlop={6}>
@@ -236,9 +293,13 @@ export default function Workout() {
 
       <Row style={{ justifyContent: 'space-between' }}>
         <Text style={styles.next} numberOfLines={1}>
-          Next: {next ? exerciseName(next.exerciseId).toLowerCase() : ''} · {next ? repsLabel(next).replace(' / side', ' per side') : ''}
+          {!nextSlot
+            ? 'Last one — finish strong.'
+            : plan.format === 'sets' && nextSlot.item === slot?.item
+              ? `Next: ${nextSlot.label.toLowerCase()} · ${repsLabel(nextSlot.item, nextSlot.reps).replace(' / side', ' per side')}`
+              : `Next: ${exerciseName(nextSlot.item.exerciseId).toLowerCase()} · ${repsLabel(nextSlot.item, nextSlot.reps).replace(' / side', ' per side')}`}
         </Text>
-        {nextKg ? <KgTag kg={nextKg} /> : null}
+        {nextSlot && bell ? <KgTag kg={bell} /> : null}
       </Row>
 
       <ExerciseHowToSheet exercise={currentEx} visible={howTo} onClose={() => setHowTo(false)} />
@@ -247,16 +308,16 @@ export default function Workout() {
         <Pressable
           accessibilityRole="button"
           onPress={onMainPress}
-          style={({ pressed }) => [styles.done, !amrap && doneThisMinute && styles.nextButton, { opacity: pressed ? 0.85 : 1 }]}
+          style={({ pressed }) => [styles.done, stepped && styles.nextButton, { opacity: pressed ? 0.85 : 1 }]}
         >
           <Text
             numberOfLines={1}
             adjustsFontSizeToFit
-            style={[styles.doneLabel, !amrap && doneThisMinute && { color: colors.text }]}
+            style={[styles.doneLabel, stepped && { color: colors.text }]}
           >
             {mainLabel}
           </Text>
-          {!amrap && doneThisMinute ? <Text style={styles.doneHint}>Logged · or rest and it starts at 0:00</Text> : null}
+          {mainHint ? <Text style={styles.doneHint}>{mainHint}</Text> : null}
         </Pressable>
         <Pressable accessibilityRole="button" onPress={togglePause} style={({ pressed }) => [styles.done, styles.pause, { opacity: pressed ? 0.85 : 1 }]}>
           <Text style={[styles.doneLabel, { color: colors.onWarn }]}>{paused ? 'Resume' : 'Pause'}</Text>

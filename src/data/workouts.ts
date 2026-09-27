@@ -12,14 +12,53 @@ import { ExerciseLevel, findExercise } from './exercises';
  */
 
 export type Group = 'full' | 'arms' | 'chest' | 'back' | 'core' | 'legs';
-export type Format = 'emom' | 'amrap';
 
-export const FORMATS: { id: Format; label: string; help: string }[] = [
-  { id: 'emom', label: 'EMOM', help: 'One exercise at the start of every minute, then rest until the next.' },
-  { id: 'amrap', label: 'AMRAP', help: 'Go through the list again and again. As many rounds as possible before time runs out.' },
+/**
+ * How a workout is run. The format is the container — it decides what the clock does —
+ * and the exercises are what you put in it.
+ */
+export type Format = 'emom' | 'amrap' | 'fortime' | 'intervals' | 'ladder' | 'sets';
+
+export type FormatSpec = {
+  id: Format;
+  label: string;
+  full: string;
+  help: string;
+  /** What the length control asks for: minutes, rounds of the list, or sets of each exercise. */
+  length: 'minutes' | 'rounds' | 'sets';
+  /** Has a running clock during the work itself. Straight sets does not — only a rest timer. */
+  clock: boolean;
+};
+
+export const FORMATS: FormatSpec[] = [
+  {
+    id: 'emom', label: 'EMOM', full: 'Every minute on the minute', length: 'minutes', clock: true,
+    help: 'One exercise at the start of every minute, then rest until the next.',
+  },
+  {
+    id: 'amrap', label: 'AMRAP', full: 'As many rounds as possible', length: 'minutes', clock: true,
+    help: 'Go through the list again and again. As many rounds as possible before time runs out.',
+  },
+  {
+    id: 'fortime', label: 'For time', full: 'For time', length: 'rounds', clock: true,
+    help: 'A set number of rounds, done as fast as you can. The clock counts up — beat it next time.',
+  },
+  {
+    id: 'intervals', label: 'Intervals', full: 'Intervals / Tabata', length: 'rounds', clock: true,
+    help: 'Work for a set time, rest for a set time, repeat. Classic Tabata is 20 seconds on, 10 off.',
+  },
+  {
+    id: 'ladder', label: 'Ladder', full: 'Ladder', length: 'minutes', clock: true,
+    help: 'Reps climb every round: one set in round one, double in round two, and on until you drop out.',
+  },
+  {
+    id: 'sets', label: 'Sets', full: 'Straight sets', length: 'sets', clock: false,
+    help: 'Plain strength work: a few sets of each exercise with a rest timer between them. No clock pressure.',
+  },
 ];
 
-export const formatLabel = (f: Format) => FORMATS.find((x) => x.id === f)?.label ?? f;
+export const formatSpec = (f: Format) => FORMATS.find((x) => x.id === f) ?? FORMATS[0];
+export const formatLabel = (f: Format) => formatSpec(f).label;
 export type Goal = 'Strength' | 'Conditioning' | 'Mobility';
 
 export const GROUPS: { id: Group; label: string }[] = [
@@ -48,8 +87,14 @@ export type Workout = {
   group: Group;
   level: ExerciseLevel;
   format: Format;
-  /** EMOM: how long it runs. AMRAP: the time cap. */
+  /** EMOM and Ladder: how long it runs. AMRAP: the time cap. Other formats: an estimate, for the card and your stats. */
   minutes: number;
+  /** For time and Intervals: rounds of the whole list. Sets: sets of each exercise. */
+  rounds?: number;
+  /** Intervals: seconds of work per exercise. */
+  workSec?: number;
+  /** Intervals and Sets: seconds of rest. */
+  restSec?: number;
   about: string;
   items: WorkoutItem[];
   generated?: boolean;
@@ -164,29 +209,149 @@ export function defaultBell(options: number[], level: 'new' | 'some' | 'experien
   return options[Math.floor((options.length - 1) / 2)];
 }
 
-export const repsFor = (item: WorkoutItem) => item.reps * (item.perSide ? 2 : 1);
-export const kgFor = (item: WorkoutItem, bell: number) => repsFor(item) * bell * (item.twoBells ? 2 : 1);
-export const itemForMinute = (w: Workout, minute: number) => w.items[(minute - 1) % w.items.length];
-export const repsLabel = (item: WorkoutItem) => `${item.reps}${item.perSide ? ' / side' : ''}`;
+export const repsFor = (item: WorkoutItem, reps = item.reps) => reps * (item.perSide ? 2 : 1);
+export const kgFor = (item: WorkoutItem, bell: number, reps = item.reps) =>
+  repsFor(item, reps) * bell * (item.twoBells ? 2 : 1);
+export const repsLabel = (item: WorkoutItem, reps = item.reps) => `${reps}${item.perSide ? ' / side' : ''}`;
 
-/** EMOM: the whole workout. AMRAP: one round (the number of rounds is up to the trainee). */
+// ---- The slot engine ----
+//
+// Every format is the same idea seen through a different clock: a workout is a run of
+// SLOTS, each one exercise with its reps. The format decides how many slots there are,
+// whether a slot has a clock of its own, and whether a rest follows it.
+
+export const roundsOf = (w: Workout) => w.rounds ?? (w.format === 'sets' ? 3 : 5);
+export const workSecOf = (w: Workout) => w.workSec ?? 30;
+export const restSecOf = (w: Workout) => w.restSec ?? (w.format === 'sets' ? 90 : 15);
+
+export type Slot = {
+  item: WorkoutItem;
+  /** Reps for this slot. Ladder climbs, everything else uses the item's own reps. */
+  reps: number;
+  round: number;
+  indexInRound: number;
+  /** What the top of the player calls this slot. */
+  label: string;
+  /** Seconds the work itself gets. Undefined means untimed — it ends when you tap Done. */
+  seconds?: number;
+  /** Seconds of rest after this slot. */
+  restAfter?: number;
+};
+
+/** How many slots the workout has, or undefined when it runs until the clock stops it (AMRAP). */
+export function slotCount(w: Workout): number | undefined {
+  const len = w.items.length || 1;
+  switch (w.format) {
+    case 'amrap':
+      return undefined;
+    case 'emom':
+    case 'ladder':
+      return w.minutes;
+    default:
+      return roundsOf(w) * len;
+  }
+}
+
+export function slotAt(w: Workout, n: number): Slot {
+  const len = w.items.length || 1;
+
+  if (w.format === 'sets') {
+    // All the sets of the first exercise, then all the sets of the second, and so on.
+    const sets = roundsOf(w);
+    const i = Math.min(Math.floor(n / sets), len - 1);
+    const setNo = (n % sets) + 1;
+    const item = w.items[i];
+    return {
+      item, reps: item.reps, round: setNo, indexInRound: i,
+      label: `Set ${setNo} of ${sets}`,
+      restAfter: restSecOf(w),
+    };
+  }
+
+  const item = w.items[n % len];
+  const round = Math.floor(n / len) + 1;
+  const indexInRound = n % len;
+  const place = `${indexInRound + 1}/${len}`;
+
+  switch (w.format) {
+    case 'emom':
+      return { item, reps: item.reps, round, indexInRound, label: `Minute ${n + 1} of ${w.minutes}`, seconds: 60 };
+    case 'ladder':
+      return { item, reps: item.reps * round, round, indexInRound, label: `Minute ${n + 1} · round ${round}`, seconds: 60 };
+    case 'intervals':
+      return {
+        item, reps: item.reps, round, indexInRound,
+        label: `Round ${round} of ${roundsOf(w)} · ${place}`,
+        seconds: workSecOf(w), restAfter: restSecOf(w),
+      };
+    case 'fortime':
+      return { item, reps: item.reps, round, indexInRound, label: `Round ${round} of ${roundsOf(w)} · ${place}` };
+    default:
+      return { item, reps: item.reps, round, indexInRound, label: `Round ${round} · ${place}` };
+  }
+}
+
+/** The clock the player runs: down inside each slot, down from a cap, or up from zero. */
+export const clockMode = (f: Format): 'slot' | 'cap' | 'up' | 'none' =>
+  f === 'amrap' ? 'cap' : f === 'fortime' ? 'up' : f === 'sets' ? 'none' : 'slot';
+
+/** The short "how long" line on cards and headers. */
+export function lengthLabel(w: Workout): string {
+  switch (w.format) {
+    case 'emom':
+      return `${w.minutes} min`;
+    case 'amrap':
+    case 'ladder':
+      return `${w.minutes} min cap`;
+    case 'fortime':
+      return `${roundsOf(w)} rounds`;
+    case 'intervals':
+      return `${roundsOf(w)} × ${workSecOf(w)}/${restSecOf(w)}s`;
+    case 'sets':
+      return `${roundsOf(w)} sets`;
+  }
+}
+
+/** Roughly how long this will take, for the card and for your weekly stats. */
+export function estimateMinutes(w: Omit<Workout, 'id' | 'name' | 'about'> & { minutes: number }): number {
+  const len = w.items.length || 1;
+  switch (w.format) {
+    case 'emom':
+    case 'amrap':
+    case 'ladder':
+      return w.minutes;
+    case 'intervals':
+      return Math.max(1, Math.round((roundsOf(w as Workout) * len * (workSecOf(w as Workout) + restSecOf(w as Workout))) / 60));
+    case 'sets':
+      return Math.max(1, Math.round((roundsOf(w as Workout) * len * (35 + restSecOf(w as Workout))) / 60));
+    case 'fortime':
+      return Math.max(1, Math.round((roundsOf(w as Workout) * len * 45) / 60));
+  }
+}
+
+/** Everything the workout asks for. AMRAP has no end, so it reports one round instead. */
 export function totals(w: Workout, bell: number) {
   let reps = 0;
   let kg = 0;
-  if (w.format === 'amrap') {
+  const count = slotCount(w);
+  if (count === undefined) {
     for (const item of w.items) {
       reps += repsFor(item);
       kg += kgFor(item, bell);
     }
     return { reps, kg };
   }
-  for (let m = 1; m <= w.minutes; m++) {
-    const item = itemForMinute(w, m);
-    reps += repsFor(item);
-    kg += kgFor(item, bell);
+  for (let n = 0; n < count; n++) {
+    const s = slotAt(w, n);
+    reps += repsFor(s.item, s.reps);
+    kg += kgFor(s.item, bell, s.reps);
   }
   return { reps, kg };
 }
+
+/** What the totals line is counting. */
+export const totalsLabel = (w: Workout) =>
+  w.format === 'amrap' ? 'One round' : w.format === 'ladder' ? 'If you go the distance' : 'Whole workout';
 
 export const exerciseName = (id: string) => findExercise(id)?.name ?? id;
 

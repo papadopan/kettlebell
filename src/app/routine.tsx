@@ -7,11 +7,14 @@ import { Icon } from '@/components/Icon';
 import { BackLink, Body, Button, Eyebrow, IconButton, Row, Screen, Title } from '@/components/ui';
 import { findExercise } from '@/data/exercises';
 import { levelLabel } from '@/data/labels';
-import { defaultBell, exerciseName, FORMATS, formatLabel, generateWorkout, getWorkout, Group, groupLabel, needsPair, repsLabel, totals, usableWeights, WorkoutItem } from '@/data/workouts';
+import {
+  defaultBell, exerciseName, Format, formatLabel, formatSpec, generateWorkout, getWorkout, Group, groupLabel, lengthLabel,
+  needsPair, repsLabel, roundsOf, totals, totalsLabel, usableWeights, WorkoutItem,
+} from '@/data/workouts';
 import { useBells } from '@/store/bells';
 import { bellColor, colors, fonts, themedStyles } from '@/theme';
 
-function ItemRow({ item, index, bell, emom }: { item: WorkoutItem; index: number; bell?: number; emom: boolean }) {
+function ItemRow({ item, index, bell, format, sets }: { item: WorkoutItem; index: number; bell?: number; format: Format; sets: number }) {
   const ex = findExercise(item.exerciseId);
   const kg = bell ?? 0;
   return (
@@ -29,7 +32,7 @@ function ItemRow({ item, index, bell, emom }: { item: WorkoutItem; index: number
           {exerciseName(item.exerciseId)}
         </Text>
         <Text style={styles.note}>
-          {emom ? `Minute ${index + 1}` : `Exercise ${index + 1}`}
+          {format === 'emom' || format === 'ladder' ? `Minute ${index + 1}` : format === 'sets' ? `${sets} sets` : `Exercise ${index + 1}`}
           {item.twoBells ? ' · both bells' : ''}
         </Text>
       </View>
@@ -62,7 +65,8 @@ export default function Routine() {
 
   const pair = needsPair(w);
   const t = totals(w, bell ?? 0);
-  const rounds = w.minutes / w.items.length;
+  const spec = formatSpec(w.format);
+  const emomRounds = w.minutes / w.items.length;
 
   return (
     <Screen
@@ -101,13 +105,15 @@ export default function Routine() {
           icon="share"
           label="Share workout"
           onPress={() =>
-            Share.share({ message: `Kettlebelt workout: ${w.name} (${w.minutes} min EMOM) — ${w.items.map((i) => exerciseName(i.exerciseId)).join(', ')}` })
+            Share.share({
+              message: `Kettlebelt workout: ${w.name} (${formatLabel(w.format)} · ${lengthLabel(w)}) — ${w.items.map((i) => exerciseName(i.exerciseId)).join(', ')}`,
+            })
           }
         />
       </Row>
       <View style={{ gap: 6 }}>
         <Eyebrow color={colors.goText}>
-          {w.custom ? 'Your workout' : groupLabel(w.group)} · {formatLabel(w.format)} · {w.minutes} min
+          {w.custom ? 'Your workout' : groupLabel(w.group)} · {formatLabel(w.format)} · {lengthLabel(w)}
           {w.custom ? '' : ` · ${levelLabel(w.level)}`}
         </Eyebrow>
         <Title>{w.name}</Title>
@@ -119,8 +125,11 @@ export default function Routine() {
       <View style={styles.how}>
         <Icon name="today" size={18} color={colors.goText} />
         <Text style={styles.howText}>
-          {FORMATS.find((f) => f.id === w.format)?.help}
-          {w.format === 'emom' && Number.isInteger(rounds) ? ` ${rounds} rounds of the list below.` : ''}
+          <Text style={styles.howStrong}>{spec.full}. </Text>
+          {spec.help}
+          {w.format === 'emom' && Number.isInteger(emomRounds) ? ` ${emomRounds} rounds of the list below.` : ''}
+          {w.format === 'fortime' || w.format === 'intervals' ? ` ${roundsOf(w)} rounds of the list below.` : ''}
+          {w.format === 'sets' ? ` ${roundsOf(w)} sets of each exercise below.` : ''}
         </Text>
       </View>
 
@@ -167,12 +176,12 @@ export default function Routine() {
 
       <View>
         {w.items.map((item, i) => (
-          <ItemRow key={`${item.exerciseId}-${i}`} item={item} index={i} bell={bell} emom={w.format === 'emom'} />
+          <ItemRow key={`${item.exerciseId}-${i}`} item={item} index={i} bell={bell} format={w.format} sets={roundsOf(w)} />
         ))}
       </View>
 
       <View style={styles.totals}>
-        <Text style={[styles.mono, { color: colors.muted }]}>{w.format === 'emom' ? 'Whole workout' : 'One round'}</Text>
+        <Text style={[styles.mono, { color: colors.muted }]}>{totalsLabel(w)}</Text>
         <Text style={styles.mono}>
           {t.reps} reps · {t.kg.toLocaleString('en-US')} kg
         </Text>
@@ -191,6 +200,7 @@ const styles = themedStyles(() =>
     mono: { fontFamily: fonts.mono, fontSize: 13, color: colors.text },
     how: { flexDirection: 'row', gap: 10, padding: 12, borderRadius: 12, backgroundColor: colors.surface },
     howText: { flex: 1, fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.muted },
+    howStrong: { fontFamily: fonts.bodySemi, color: colors.text },
     bellBox: { gap: 10, padding: 14, borderRadius: 14, backgroundColor: colors.surface },
     bellRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     bellChip: { minWidth: 72, height: 64, borderRadius: 12, borderWidth: 2, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 10 },

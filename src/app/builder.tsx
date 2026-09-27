@@ -8,12 +8,31 @@ import { Icon } from '@/components/Icon';
 import { BackLink, Body, Button, Chip, Eyebrow, Row, Screen, tap, Title } from '@/components/ui';
 import { Exercise, exercises, findExercise } from '@/data/exercises';
 import { patternLabel } from '@/data/labels';
-import { exerciseName, Format, FORMATS, getWorkout, Group, groupLabel, GROUPS, Workout, WorkoutItem } from '@/data/workouts';
+import {
+  estimateMinutes, exerciseName, Format, FORMATS, formatSpec, getWorkout, Group, groupLabel, GROUPS, lengthLabel, Workout, WorkoutItem,
+} from '@/data/workouts';
 import { newWorkoutId, useMyWorkouts } from '@/store/myWorkouts';
 import { colors, fonts, space, themedStyles } from '@/theme';
 
 const EMOM_TIMES = [10, 16, 20, 30];
 const AMRAP_TIMES = [6, 10, 12, 20];
+const LADDER_TIMES = [10, 15, 20];
+const FORTIME_ROUNDS = [3, 5, 7, 10];
+const INTERVAL_ROUNDS = [4, 6, 8, 10];
+const SET_COUNTS = [3, 4, 5];
+const WORK_SECONDS = [20, 30, 40, 45];
+const INTERVAL_REST = [10, 15, 20, 30];
+const SET_REST = [60, 90, 120];
+
+/** Sensible starting numbers when you switch format, so nothing is ever blank. */
+const DEFAULTS: Record<Format, { minutes: number; rounds: number; workSec: number; restSec: number }> = {
+  emom: { minutes: 20, rounds: 5, workSec: 30, restSec: 15 },
+  amrap: { minutes: 12, rounds: 5, workSec: 30, restSec: 15 },
+  fortime: { minutes: 15, rounds: 5, workSec: 30, restSec: 15 },
+  intervals: { minutes: 12, rounds: 8, workSec: 20, restSec: 10 },
+  ladder: { minutes: 15, rounds: 5, workSec: 30, restSec: 15 },
+  sets: { minutes: 20, rounds: 4, workSec: 30, restSec: 90 },
+};
 
 /** Search-and-tap list for adding an exercise to the workout. */
 function ExercisePicker({ visible, onPick, onClose }: { visible: boolean; onPick: (e: Exercise) => void; onClose: () => void }) {
@@ -109,13 +128,49 @@ export default function Builder() {
   const [name, setName] = useState(editing?.name ?? '');
   const [format, setFormat] = useState<Format>(editing?.format ?? 'emom');
   const [minutes, setMinutes] = useState(editing?.minutes ?? 20);
+  const [rounds, setRounds] = useState(editing?.rounds ?? 5);
+  const [workSec, setWorkSec] = useState(editing?.workSec ?? 30);
+  const [restSec, setRestSec] = useState(editing?.restSec ?? 15);
   const [group, setGroup] = useState<Group>(editing?.group ?? 'full');
   const [items, setItems] = useState<WorkoutItem[]>(editing?.items ?? []);
   const [picking, setPicking] = useState(false);
 
-  const times = format === 'emom' ? EMOM_TIMES : AMRAP_TIMES;
-  const rounds = items.length ? minutes / items.length : 0;
+  const spec = formatSpec(format);
+  const times = format === 'emom' ? EMOM_TIMES : format === 'ladder' ? LADDER_TIMES : AMRAP_TIMES;
+  const roundChoices = format === 'intervals' ? INTERVAL_ROUNDS : format === 'sets' ? SET_COUNTS : FORTIME_ROUNDS;
+  const emomRounds = items.length ? minutes / items.length : 0;
   const canSave = items.length > 0;
+
+  const pickFormat = (f: Format) => {
+    const d = DEFAULTS[f];
+    setFormat(f);
+    setMinutes(d.minutes);
+    setRounds(d.rounds);
+    setWorkSec(d.workSec);
+    setRestSec(d.restSec);
+  };
+
+  /** A plain-language sentence of what the numbers above add up to. */
+  const planLine = (() => {
+    const n = items.length;
+    const estimate = estimateMinutes({
+      group, level: 'intermediate', format, minutes, rounds, workSec, restSec, items,
+    } as Workout);
+    switch (format) {
+      case 'emom':
+        return `${minutes} min ÷ ${n} exercises = ${Number.isInteger(emomRounds) ? emomRounds : emomRounds.toFixed(1)} rounds`;
+      case 'amrap':
+        return `As many rounds of ${n} exercises as you can do in ${minutes} min`;
+      case 'fortime':
+        return `${rounds} rounds × ${n} exercises = ${rounds * n} sets, as fast as you can (about ${estimate} min)`;
+      case 'intervals':
+        return `${rounds} rounds × ${n} exercises · ${workSec}s on / ${restSec}s off ≈ ${estimate} min`;
+      case 'ladder':
+        return `Round 1 the reps below, round 2 double, round 3 triple… up to ${minutes} min`;
+      case 'sets':
+        return `${rounds} sets × ${n} exercises = ${rounds * n} sets · ${restSec}s rest ≈ ${estimate} min`;
+    }
+  })();
 
   const update = (index: number, patch: Partial<WorkoutItem>) =>
     setItems((list) => list.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -129,6 +184,24 @@ export default function Builder() {
       return next;
     });
 
+  const about = () => {
+    const n = items.length;
+    switch (format) {
+      case 'emom':
+        return `Your own EMOM: ${n} exercises, ${minutes} minutes.`;
+      case 'amrap':
+        return `Your own AMRAP: ${n} exercises, as many rounds as possible in ${minutes} minutes.`;
+      case 'fortime':
+        return `Your own for-time workout: ${rounds} rounds of ${n} exercises, as fast as you can.`;
+      case 'intervals':
+        return `Your own intervals: ${workSec} seconds on, ${restSec} off, ${rounds} rounds of ${n} exercises.`;
+      case 'ladder':
+        return `Your own ladder: ${n} exercises, reps climbing every round for up to ${minutes} minutes.`;
+      case 'sets':
+        return `Your own strength session: ${rounds} sets of each of ${n} exercises, ${restSec} seconds rest.`;
+    }
+  };
+
   const onSave = () => {
     const workout: Workout = {
       id: editing?.id ?? newWorkoutId(),
@@ -137,14 +210,16 @@ export default function Builder() {
       level: editing?.level ?? 'intermediate',
       format,
       minutes,
-      about:
-        format === 'emom'
-          ? `Your own EMOM: ${items.length} exercises, ${minutes} minutes.`
-          : `Your own AMRAP: ${items.length} exercises, as many rounds as possible in ${minutes} minutes.`,
+      rounds: spec.length === 'minutes' ? undefined : rounds,
+      workSec: format === 'intervals' ? workSec : undefined,
+      restSec: format === 'intervals' || format === 'sets' ? restSec : undefined,
+      about: about(),
       items,
       custom: true,
       createdAt: editing?.createdAt ?? new Date().toISOString(),
     };
+    // Formats without a fixed length still need an estimate, for the card and the weekly totals.
+    workout.minutes = estimateMinutes(workout);
     save(workout);
     router.replace({ pathname: '/routine', params: { id: workout.id } });
   };
@@ -193,31 +268,78 @@ export default function Builder() {
               key={f.id}
               label={f.label}
               selected={format === f.id}
-              onPress={() => {
-                setFormat(f.id);
-                setMinutes(f.id === 'emom' ? 20 : 12);
-              }}
+              onPress={() => pickFormat(f.id)}
             />
           ))}
         </View>
-        <Text style={styles.hint}>{FORMATS.find((f) => f.id === format)?.help}</Text>
+        <Text style={styles.hint}>
+          <Text style={styles.hintStrong}>{spec.full}. </Text>
+          {spec.help}
+        </Text>
       </View>
 
-      <View style={styles.section}>
-        <Eyebrow>{format === 'emom' ? 'Length' : 'Time cap'}</Eyebrow>
-        <View style={styles.wrap}>
-          {times.map((t) => (
-            <Chip key={t} label={`${t} min`} selected={minutes === t} onPress={() => setMinutes(t)} />
-          ))}
+      {spec.length === 'minutes' ? (
+        <View style={styles.section}>
+          <Eyebrow>{format === 'emom' ? 'Length' : 'Time cap'}</Eyebrow>
+          <View style={styles.wrap}>
+            {times.map((t) => (
+              <Chip key={t} label={`${t} min`} selected={minutes === t} onPress={() => setMinutes(t)} />
+            ))}
+          </View>
         </View>
-        {items.length ? (
-          <Text style={styles.hint}>
-            {format === 'emom'
-              ? `${minutes} minutes ÷ ${items.length} exercises = ${Number.isInteger(rounds) ? rounds : rounds.toFixed(1)} rounds`
-              : `As many rounds of ${items.length} exercises as you can do in ${minutes} minutes.`}
-          </Text>
-        ) : null}
-      </View>
+      ) : (
+        <View style={styles.section}>
+          <Eyebrow>{spec.length === 'sets' ? 'Sets of each exercise' : 'Rounds'}</Eyebrow>
+          <View style={styles.wrap}>
+            {roundChoices.map((r) => (
+              <Chip
+                key={r}
+                label={spec.length === 'sets' ? `${r} sets` : `${r} rounds`}
+                selected={rounds === r}
+                onPress={() => setRounds(r)}
+              />
+            ))}
+          </View>
+        </View>
+      )}
+
+      {format === 'intervals' ? (
+        <>
+          <View style={styles.section}>
+            <Eyebrow>Work</Eyebrow>
+            <View style={styles.wrap}>
+              {WORK_SECONDS.map((t) => (
+                <Chip key={t} label={`${t}s on`} selected={workSec === t} onPress={() => setWorkSec(t)} />
+              ))}
+            </View>
+          </View>
+          <View style={styles.section}>
+            <Eyebrow>Rest</Eyebrow>
+            <View style={styles.wrap}>
+              {INTERVAL_REST.map((t) => (
+                <Chip key={t} label={`${t}s off`} selected={restSec === t} onPress={() => setRestSec(t)} />
+              ))}
+            </View>
+          </View>
+        </>
+      ) : null}
+
+      {format === 'sets' ? (
+        <View style={styles.section}>
+          <Eyebrow>Rest between sets</Eyebrow>
+          <View style={styles.wrap}>
+            {SET_REST.map((t) => (
+              <Chip key={t} label={t >= 60 ? `${t / 60} min` : `${t}s`} selected={restSec === t} onPress={() => setRestSec(t)} />
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {items.length ? (
+        <View style={styles.plan}>
+          <Text style={styles.planLine}>{planLine}</Text>
+        </View>
+      ) : null}
 
       <View style={styles.section}>
         <Eyebrow>Body part</Eyebrow>
@@ -254,7 +376,7 @@ export default function Builder() {
                 <View style={{ flex: 1, gap: 10 }}>
                   <Row style={{ justifyContent: 'space-between' }}>
                     <Text style={styles.name} numberOfLines={2}>
-                      {format === 'emom' ? `Minute ${i + 1} · ` : ''}
+                      {format === 'emom' || format === 'ladder' ? `Minute ${i + 1} · ` : ''}
                       {exerciseName(item.exerciseId)}
                     </Text>
                     <Row style={{ gap: 4 }}>
@@ -311,7 +433,10 @@ const styles = themedStyles(() =>
   StyleSheet.create({
     section: { gap: 10 },
     wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    hint: { fontFamily: fonts.body, fontSize: 12, color: colors.muted },
+    hint: { fontFamily: fonts.body, fontSize: 12, lineHeight: 17, color: colors.muted },
+    hintStrong: { fontFamily: fonts.bodySemi, color: colors.text },
+    plan: { padding: 12, borderRadius: 12, backgroundColor: colors.surface },
+    planLine: { fontFamily: fonts.mono, fontSize: 12, lineHeight: 18, color: colors.muted },
     search: { backgroundColor: colors.surface, borderRadius: 12, paddingHorizontal: 14, height: 48, justifyContent: 'center' },
     searchInput: { fontFamily: fonts.body, fontSize: 15, color: colors.text },
     item: { backgroundColor: colors.surface, borderRadius: 14, padding: 12 },
