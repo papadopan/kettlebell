@@ -18,6 +18,13 @@ export type Session = {
    * stays openable after the plan is stopped or the workout is deleted.
    */
   workout?: Workout;
+  /** Set once this session has been written to Apple Health, so it is never written twice. */
+  healthId?: string;
+  /**
+   * What was actually completed, per exercise. Absent on sessions logged before this
+   * was recorded — stats fall back to estimating those from the workout snapshot.
+   */
+  byExercise?: Record<string, { sets: number; reps: number; kg: number }>;
   format: Format;
   /** Bell weight used, in kg. */
   bell: number;

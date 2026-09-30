@@ -16,6 +16,7 @@ export default function Summary() {
   const p = useLocalSearchParams<{
     id?: string; format?: string; bell?: string; name?: string; minutes?: string;
     rounds?: string; target?: string; sets?: string; reps?: string; kg?: string; seconds?: string;
+    byExercise?: string;
   }>();
   const format: Format = (FORMATS.find((f) => f.id === p.format)?.id ?? 'emom') as Format;
   const [feel, setFeel] = useState('About right');
@@ -64,6 +65,13 @@ export default function Summary() {
               date: new Date().toISOString(),
               name: p.name ?? 'Workout',
               workoutId: p.id || undefined,
+              byExercise: (() => {
+                try {
+                  return p.byExercise ? JSON.parse(p.byExercise) : undefined;
+                } catch {
+                  return undefined;
+                }
+              })(),
               // Frozen with the session, so the log survives the plan being stopped.
               workout: p.id ? getWorkout(p.id) : undefined,
               format,

@@ -3,9 +3,9 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Bell } from '@/components/Bell';
 import { Body, Button, Card, Eyebrow, Row, Screen, Title } from '@/components/ui';
-import { bellUse, bests, daysAgo, weeks, weekStreak } from '@/data/stats';
+import { bellUse, bests, daysAgo, patternVolume, weeks, weekStreak } from '@/data/stats';
 import { useSessions } from '@/store/sessions';
-import { bellColor, colors, fonts, themedStyles } from '@/theme';
+import { bellColor, colors, fonts, mix, themedStyles } from '@/theme';
 
 const kg = (n: number) => n.toLocaleString('en-US');
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -70,6 +70,82 @@ function WeeklyBars({ data }: { data: { label: string; kg: number; sessions: num
   );
 }
 
+/**
+ * Volume by movement pattern, week by week. One sequential scale (surface → green),
+ * so no legend of colours is needed beyond the less/more key; an empty row is the
+ * whole point of the chart, so zero reads flat rather than faintly green.
+ */
+const SHORT: Record<string, string> = {
+  hinge: 'Hinge',
+  squat: 'Squat',
+  push: 'Push',
+  pull: 'Pull',
+  getup: 'Get-up',
+  carry: 'Carry',
+  core: 'Core',
+};
+
+function PatternHeat({ data }: { data: ReturnType<typeof patternVolume> }) {
+  const { rows, max, estimated } = data;
+
+  const cellColor = (kg: number) => {
+    if (kg <= 0) return colors.surface2;
+    // Even the smallest real value must be visibly not-nothing.
+    return mix(colors.surface2, colors.go, 0.28 + 0.72 * (kg / max));
+  };
+
+  if (max <= 0) {
+    return (
+      <View style={{ gap: 6, paddingVertical: 10 }}>
+        <Text style={styles.emptyLine}>No pattern data yet.</Text>
+        <Text style={styles.caption}>
+          Save a few sessions and this fills in — it shows which movements you are training and which you are
+          quietly skipping.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ gap: 10 }}>
+      {rows.map((r) => (
+        <Row key={r.pattern} style={{ gap: 8 }}>
+          <Text style={[styles.heatLabel, r.total === 0 && { color: colors.dim }]} numberOfLines={1}>
+            {SHORT[r.pattern] ?? r.label}
+          </Text>
+          <Row style={{ flex: 1, gap: 3 }}>
+            {r.cells.map((kgInWeek, i) => (
+              <View
+                key={i}
+                accessibilityLabel={`${r.label}, week ${i + 1}: ${kg(Math.round(kgInWeek))} kilograms`}
+                style={[styles.cell, { backgroundColor: cellColor(kgInWeek) }]}
+              />
+            ))}
+          </Row>
+        </Row>
+      ))}
+
+      <Row style={{ justifyContent: 'space-between', paddingTop: 2 }}>
+        <Text style={styles.caption}>8 weeks ago</Text>
+        <Row style={{ gap: 5, alignItems: 'center' }}>
+          <Text style={styles.caption}>less</Text>
+          {[0, 0.25, 0.5, 0.75, 1].map((t) => (
+            <View key={t} style={[styles.key, { backgroundColor: t === 0 ? colors.surface2 : mix(colors.surface2, colors.go, 0.28 + 0.72 * t) }]} />
+          ))}
+          <Text style={styles.caption}>more</Text>
+        </Row>
+        <Text style={styles.caption}>this week</Text>
+      </Row>
+
+      {estimated > 0 ? (
+        <Text style={styles.caption}>
+          {estimated} earlier session{estimated === 1 ? '' : 's'} estimated from the workout, not measured per exercise.
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 function Stat({ value, label }: { value: string; label: string }) {
   return (
     <View style={styles.stat}>
@@ -122,6 +198,7 @@ export default function Stats() {
   const best = bests(sessions);
   const bells = bellUse(sessions);
   const streak = weekStreak(sessions);
+  const patterns = patternVolume(sessions, 8);
   const last = sessions[0];
 
   return (
@@ -149,6 +226,14 @@ export default function Stats() {
       <Card>
         <Eyebrow>Volume</Eyebrow>
         <WeeklyBars data={series} />
+      </Card>
+
+      <Card style={{ gap: 12 }}>
+        <View style={{ gap: 4 }}>
+          <Eyebrow>What you are training</Eyebrow>
+          <Text style={styles.caption}>Kilograms by movement pattern, week by week.</Text>
+        </View>
+        <PatternHeat data={patterns} />
       </Card>
 
       <Row style={{ alignItems: 'stretch' }}>
@@ -233,6 +318,9 @@ const styles = themedStyles(() =>
     chartEmpty: { gap: 6, paddingVertical: 18 },
     emptyLine: { fontFamily: fonts.bodyMedium, fontSize: 14, color: colors.text },
     baseline: { height: 1, backgroundColor: colors.line, marginTop: -8 },
+    heatLabel: { width: 46, fontFamily: fonts.body, fontSize: 12, color: colors.muted },
+    cell: { flex: 1, height: 22, borderRadius: 5 },
+    key: { width: 12, height: 12, borderRadius: 3 },
     col: { flex: 1, alignItems: 'center', gap: 6 },
     bar: { width: '100%', borderTopLeftRadius: 4, borderTopRightRadius: 4 },
     barValue: { fontFamily: fonts.mono, fontSize: 10, color: colors.muted },

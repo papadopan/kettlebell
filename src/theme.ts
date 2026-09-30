@@ -90,3 +90,16 @@ export const fonts = {
 } as const;
 
 export const space = { gutter: 22 } as const;
+
+/** Blend two hex colours. Used for sequential scales, which must stay monotonic. */
+export function mix(from: string, to: string, t: number): string {
+  const clamp = Math.max(0, Math.min(1, t));
+  const parse = (hex: string) => {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  };
+  const [r1, g1, b1] = parse(from);
+  const [r2, g2, b2] = parse(to);
+  const to2 = (v: number) => Math.round(v).toString(16).padStart(2, '0');
+  return `#${to2(r1 + (r2 - r1) * clamp)}${to2(g1 + (g2 - g1) * clamp)}${to2(b1 + (b2 - b1) * clamp)}`;
+}

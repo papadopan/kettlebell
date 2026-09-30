@@ -2,9 +2,11 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Bell } from '@/components/Bell';
+import { Icon } from '@/components/Icon';
 import { Body, Button, Card, Chip, Eyebrow, IconButton, Row, Screen, Title } from '@/components/ui';
 import { levelLabel } from '@/data/labels';
 import { blockProgress, nextDay, weekProgress } from '@/data/programs';
+import { nextInsight } from '@/data/insights';
 import { weeks, weekStreak } from '@/data/stats';
 import { defaultBell, exerciseName, formatLabel, GROUPS, lengthLabel, repsLabel, usableWeights, Workout, workouts } from '@/data/workouts';
 import { Level, useBells } from '@/store/bells';
@@ -22,8 +24,31 @@ function suggestion(level: Level, owned: Record<number, number>): Workout {
   );
 }
 
+/**
+ * A single derived prompt, shown only when there is something worth saying.
+ * Deliberately a quiet row rather than a filled card: the green Start button on the
+ * plan is the primary action, and this must not compete with it.
+ */
+function InsightRow({ insight, onPress }: { insight: NonNullable<ReturnType<typeof nextInsight>>; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${insight.title}. ${insight.body}`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.insight, { opacity: pressed ? 0.75 : 1 }]}
+    >
+      {insight.bell ? <Bell kg={insight.bell} size={30} /> : null}
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={styles.insightTitle}>{insight.title}</Text>
+        <Text style={styles.insightBody}>{insight.body}</Text>
+      </View>
+      <Icon name="chevron" size={18} color={colors.goText} />
+    </Pressable>
+  );
+}
+
 export default function Today() {
-  const { owned, level } = useBells();
+  const { owned, level, daysPerWeek, weights } = useBells();
   const { mode, toggle } = useTheme();
   const { sessions } = useSessions();
   const { block } = useProgram();
@@ -31,12 +56,13 @@ export default function Today() {
   const bell = defaultBell(usableWeights(w, owned), level);
 
   const thisWeek = weeks(sessions, 1)[0];
+  const streak = weekStreak(sessions);
   const stats = [
-    { value: `${thisWeek?.sessions ?? 0}`, label: 'sessions' },
     { value: (thisWeek?.kg ?? 0).toLocaleString('en-US'), label: 'kg moved' },
-    { value: `${weekStreak(sessions)}`, label: 'week streak' },
+    { value: `${streak}`, label: `week${streak === 1 ? '' : 's'} in a row` },
   ];
 
+  const insight = nextInsight(sessions, weights);
   const up = block ? nextDay(block) : undefined;
   const progress = block ? blockProgress(block) : undefined;
   const week = block && up ? weekProgress(block, up.week) : undefined;
@@ -65,6 +91,21 @@ export default function Today() {
           </View>
         ))}
       </Row>
+
+      {insight ? (
+        <InsightRow
+          insight={insight}
+          onPress={() => {
+            // Take them straight into the next thing, already set to the heavier bell.
+            const id = up?.workout.id ?? w.id;
+            router.push({ pathname: '/routine', params: insight.bell ? { id, kg: String(insight.bell) } : { id } });
+          }}
+        />
+      ) : !block ? (
+        <Text style={styles.weekNote}>
+          {thisWeek?.sessions ?? 0} of {daysPerWeek || 3} this week
+        </Text>
+      ) : null}
 
       {block && up ? (
         <Card>
@@ -172,6 +213,19 @@ const styles = themedStyles(() =>
     reps: { fontFamily: fonts.mono, fontSize: 13, color: colors.text },
     link: { fontFamily: fonts.body, fontSize: 13, color: colors.goText },
     groups: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    insight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      padding: 14,
+      borderRadius: 16,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.go,
+    },
+    insightTitle: { fontFamily: fonts.displayBold, fontSize: 20, color: colors.text, textTransform: 'uppercase' },
+    insightBody: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.muted },
+    weekNote: { fontFamily: fonts.body, fontSize: 12, color: colors.muted },
     planBar: { height: 8, borderRadius: 4, backgroundColor: colors.surface2, overflow: 'hidden' },
     planFill: { height: 8, borderRadius: 4, backgroundColor: colors.go },
   }),

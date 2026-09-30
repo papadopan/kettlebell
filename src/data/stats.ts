@@ -1,3 +1,5 @@
+import { findExercise, Pattern, PATTERNS } from '@/data/exercises';
+import { kgFor } from '@/data/workouts';
 import { Session } from '@/store/sessions';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -116,3 +118,80 @@ export function dayLabel(date: Date): string {
 }
 
 export const sessionTime = (iso: string) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+// ---- Movement-pattern volume ----
+
+export type PatternRow = {
+  pattern: Pattern;
+  label: string;
+  /** Kilograms moved in each week, oldest first. */
+  cells: number[];
+  total: number;
+};
+
+export type PatternVolume = {
+  rows: PatternRow[];
+  /** The biggest single cell, which the colour scale is stretched against. */
+  max: number;
+  /** How many sessions had to be estimated rather than measured. */
+  estimated: number;
+};
+
+/**
+ * Kilograms per movement pattern per week — the "what am I neglecting" view.
+ *
+ * Sessions logged since we started recording per-exercise credits are exact. Older
+ * ones only know their total, so their weight is split across the exercises the
+ * workout contained, in proportion to what each would have contributed. That is an
+ * estimate, and the count is reported so the screen can say so.
+ */
+export function patternVolume(sessions: Session[], count = 8): PatternVolume {
+  const buckets = weeks(sessions, count).map((w) => w.start.getTime());
+  const end = buckets[buckets.length - 1] + 7 * DAY;
+  const totals = new Map<Pattern, number[]>();
+  const blank = () => Array.from({ length: count }, () => 0);
+  let estimated = 0;
+
+  const weekIndex = (iso: string) => {
+    const t = new Date(iso).getTime();
+    if (!Number.isFinite(t) || t < buckets[0] || t >= end) return -1;
+    for (let i = buckets.length - 1; i >= 0; i--) if (t >= buckets[i]) return i;
+    return -1;
+  };
+
+  const add = (pattern: Pattern | undefined, week: number, kg: number) => {
+    if (!pattern || week < 0 || !Number.isFinite(kg) || kg <= 0) return;
+    const row = totals.get(pattern) ?? blank();
+    row[week] += kg;
+    totals.set(pattern, row);
+  };
+
+  for (const s of sessions) {
+    const week = weekIndex(s.date);
+    if (week < 0) continue;
+
+    if (s.byExercise) {
+      for (const [exerciseId, v] of Object.entries(s.byExercise)) {
+        add(findExercise(exerciseId)?.pattern, week, num(v?.kg));
+      }
+      continue;
+    }
+
+    // No breakdown recorded: split the session total across what the workout held.
+    const items = s.workout?.items ?? [];
+    const shares = items.map((i) => kgFor(i, num(s.bell) || 1));
+    const sum = shares.reduce((a, b) => a + b, 0);
+    if (!items.length || sum <= 0) continue;
+    estimated += 1;
+    items.forEach((item, i) => {
+      add(findExercise(item.exerciseId)?.pattern, week, (num(s.kg) * shares[i]) / sum);
+    });
+  }
+
+  const rows: PatternRow[] = PATTERNS.map((p) => {
+    const cells = totals.get(p.id) ?? blank();
+    return { pattern: p.id, label: p.label, cells, total: cells.reduce((a, b) => a + b, 0) };
+  });
+
+  return { rows, max: Math.max(...rows.flatMap((r) => r.cells), 0), estimated };
+}

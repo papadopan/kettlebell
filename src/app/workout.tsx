@@ -13,7 +13,8 @@ import {
 import { IconButton, Row, Screen } from '@/components/ui';
 import { bellColor, colors, fonts, themedStyles } from '@/theme';
 
-type Credit = { reps: number; kg: number };
+/** One completed set. The exercise is kept so stats can tell hinge work from pressing. */
+type Credit = { reps: number; kg: number; exerciseId: string };
 
 const clock = (seconds: number) => {
   const s = Math.max(0, Math.round(seconds));
@@ -67,6 +68,14 @@ export default function Workout() {
     // "Rounds" means whole trips through the list where that is the point, and
     // completed sets where it is not (EMOM minutes, ladder rungs, straight sets).
     const cycles = plan && (plan.format === 'amrap' || plan.format === 'fortime' || plan.format === 'intervals');
+    // What was actually done, per exercise — not what the workout contained.
+    const byExercise: Record<string, { sets: number; reps: number; kg: number }> = {};
+    for (const c of all) {
+      const e = (byExercise[c.exerciseId] ??= { sets: 0, reps: 0, kg: 0 });
+      e.sets += 1;
+      e.reps += c.reps;
+      e.kg += c.kg;
+    }
     router.replace({
       pathname: '/summary',
       params: {
@@ -81,6 +90,7 @@ export default function Workout() {
         reps: String(all.reduce((a, c) => a + c.reps, 0)),
         kg: String(all.reduce((a, c) => a + c.kg, 0)),
         seconds: String(elapsed.current),
+        byExercise: JSON.stringify(byExercise),
       },
     });
   };
@@ -118,7 +128,10 @@ export default function Workout() {
     goTo(n + 1, extra);
   };
 
-  const creditFor = () => (slot ? { reps: repsFor(slot.item, slot.reps), kg: kgFor(slot.item, bell, slot.reps) } : null);
+  const creditFor = () =>
+    slot
+      ? { reps: repsFor(slot.item, slot.reps), kg: kgFor(slot.item, bell, slot.reps), exerciseId: slot.item.exerciseId }
+      : null;
 
   // One tick a second. Everything that counts is driven from here.
   useEffect(() => {
