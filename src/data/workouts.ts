@@ -412,6 +412,11 @@ const POOL: Record<Group, PoolEntry[]> = {
 
 const generated = new Map<string, Workout>();
 const mine = new Map<string, Workout>();
+/**
+ * Workouts kept alive because a saved session points at them. A logged session must
+ * stay openable for ever, even after its plan is stopped or its workout is deleted.
+ */
+const logged = new Map<string, Workout>();
 
 /** The workout builder's store calls this whenever the user's saved workouts change. */
 export function registerMyWorkouts(list: Workout[]) {
@@ -420,7 +425,15 @@ export function registerMyWorkouts(list: Workout[]) {
 }
 
 export function getWorkout(id: string): Workout | undefined {
-  return workouts.find((w) => w.id === id) ?? mine.get(id) ?? generated.get(id);
+  return (
+    workouts.find((w) => w.id === id) ?? mine.get(id) ?? program.get(id) ?? generated.get(id) ?? logged.get(id)
+  );
+}
+
+/** The sessions store calls this with the workout snapshots saved alongside each session. */
+export function registerLoggedWorkouts(list: Workout[]) {
+  logged.clear();
+  for (const w of list) logged.set(w.id, w);
 }
 
 function shuffle<T>(list: T[]): T[] {
@@ -432,12 +445,38 @@ function shuffle<T>(list: T[]): T[] {
   return a;
 }
 
-/** Builds a new EMOM from the chosen body part, time and goal, and remembers it for this session. */
-export function generateWorkout(opts: { group: Group; minutes: number; goal: Goal; pair?: boolean }): Workout {
-  const count = opts.minutes <= 10 ? 2 : opts.minutes <= 20 ? 3 : 4;
+export type GenerateOptions = {
+  group: Group;
+  goal: Goal;
+  pair?: boolean;
+  /** Length for the minute-based formats. Defaults to 20. */
+  minutes?: number;
+  format?: Format;
+  rounds?: number;
+  workSec?: number;
+  restSec?: number;
+  /** How many exercises to pick. Defaults to something sensible for the length. */
+  count?: number;
+  /** Scales every rep count. A program week uses this to add volume. */
+  volume?: number;
+  name?: string;
+  about?: string;
+  level?: ExerciseLevel;
+  /** Set to keep the workout out of the session cache (a program stores its own copy). */
+  ephemeral?: boolean;
+};
+
+/** Builds a workout from the chosen body part, format and goal, and remembers it for this session. */
+export function generateWorkout(opts: GenerateOptions): Workout {
+  const format = opts.format ?? 'emom';
+  const minutes = opts.minutes ?? 20;
+  const count = opts.count ?? (format === 'sets' ? 3 : minutes <= 10 ? 2 : minutes <= 20 ? 3 : 4);
   const pool = POOL[opts.group].filter((p) => opts.pair || !p.twoBells);
-  const picks = shuffle(pool).slice(0, count);
-  const factor = opts.goal === 'Strength' ? 0.7 : opts.goal === 'Conditioning' ? 1.3 : 1;
+  const picks = shuffle(pool).slice(0, Math.min(count, pool.length));
+  const goalFactor = opts.goal === 'Strength' ? 0.7 : opts.goal === 'Conditioning' ? 1.3 : 1;
+  // Timed work needs fewer reps per slot than a whole minute does.
+  const formatFactor = format === 'intervals' ? 0.6 : format === 'ladder' ? 0.35 : format === 'sets' ? 0.8 : 1;
+  const factor = goalFactor * formatFactor * (opts.volume ?? 1);
   const items = picks.map<WorkoutItem>((p) => ({
     exerciseId: p.id,
     reps: Math.max(1, Math.round(p.reps * factor)),
@@ -445,17 +484,29 @@ export function generateWorkout(opts: { group: Group; minutes: number; goal: Goa
     twoBells: p.twoBells,
   }));
   const w: Workout = {
-    format: 'emom',
-    id: `gen-${Date.now()}`,
-    name: `Your ${groupLabel(opts.group).toLowerCase()} EMOM`,
+    format,
+    id: `gen-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+    name: opts.name ?? `Your ${groupLabel(opts.group).toLowerCase()} ${formatLabel(format).toLowerCase()}`,
     group: opts.group,
-    level: 'intermediate',
-    minutes: opts.minutes,
-    about: `${opts.goal} focus, built from your bells. Shuffle for a different mix.`,
+    level: opts.level ?? 'intermediate',
+    minutes,
+    rounds: opts.rounds,
+    workSec: opts.workSec,
+    restSec: opts.restSec,
+    about: opts.about ?? `${opts.goal} focus, built from your bells. Shuffle for a different mix.`,
     items,
     generated: true,
     goal: opts.goal,
   };
-  generated.set(w.id, w);
+  w.minutes = estimateMinutes(w);
+  if (!opts.ephemeral) generated.set(w.id, w);
   return w;
+}
+
+const program = new Map<string, Workout>();
+
+/** The program store calls this so a block's frozen workouts can be found by id. */
+export function registerProgramWorkouts(list: Workout[]) {
+  program.clear();
+  for (const w of list) program.set(w.id, w);
 }

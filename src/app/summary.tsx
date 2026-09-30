@@ -4,8 +4,9 @@ import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
 import { Bell } from '@/components/Bell';
 import { Body, Button, Chip, Eyebrow, IconButton, Row, Screen, Title } from '@/components/ui';
-import { Format, FORMATS, formatLabel } from '@/data/workouts';
+import { Format, FORMATS, formatLabel, getWorkout } from '@/data/workouts';
 import { useBells } from '@/store/bells';
+import { useProgram } from '@/store/program';
 import { useSessions } from '@/store/sessions';
 import { bellColor, colors, fonts, themedStyles } from '@/theme';
 
@@ -13,13 +14,15 @@ const FEEL = ['Easy', 'About right', 'Hard'];
 
 export default function Summary() {
   const p = useLocalSearchParams<{
-    format?: string; bell?: string; name?: string; minutes?: string;
+    id?: string; format?: string; bell?: string; name?: string; minutes?: string;
     rounds?: string; target?: string; sets?: string; reps?: string; kg?: string; seconds?: string;
   }>();
   const format: Format = (FORMATS.find((f) => f.id === p.format)?.id ?? 'emom') as Format;
   const [feel, setFeel] = useState('About right');
   const { weights } = useBells();
   const { add } = useSessions();
+  const { block, completeByWorkout } = useProgram();
+  const planDay = block?.days.find((d) => d.workout.id === p.id);
   const bell = Number(p.bell ?? 0);
   // Progression: after an easy session suggest the next bell you own, or the next standard size if you have none heavier.
   const heavierOwned = weights.find((kg) => kg > bell);
@@ -60,6 +63,9 @@ export default function Summary() {
               id: `s-${Date.now()}`,
               date: new Date().toISOString(),
               name: p.name ?? 'Workout',
+              workoutId: p.id || undefined,
+              // Frozen with the session, so the log survives the plan being stopped.
+              workout: p.id ? getWorkout(p.id) : undefined,
               format,
               bell,
               seconds,
@@ -68,12 +74,16 @@ export default function Summary() {
               kg,
               feel,
             });
+            // If this was a day in the plan, tick it off and move the plan on.
+            if (p.id) completeByWorkout(p.id);
             router.dismissAll();
           }}
         />}>
       <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 20 }}>
         <View style={{ gap: 6 }}>
-          <Eyebrow color={colors.goText}>Session complete</Eyebrow>
+          <Eyebrow color={colors.goText}>
+            {planDay ? `Plan · week ${planDay.week}, day ${planDay.dayOfWeek}` : 'Session complete'}
+          </Eyebrow>
           <Title size={48}>Nice work</Title>
           <Body muted style={{ fontSize: 14 }}>
             {p.name ?? 'Workout'} · {formatLabel(format)} · {today}

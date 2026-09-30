@@ -15,6 +15,9 @@ const palettes = {
     onGo: '#0B1A11',
     warn: '#F5A524',
     onWarn: '#1F1400',
+    /** Reserved for actions that end something. Never used as a series or accent colour. */
+    stop: '#E6645A',
+    onStop: '#210907',
   },
   light: {
     bg: '#F3F4F2',
@@ -29,6 +32,8 @@ const palettes = {
     onGo: '#08140D',
     warn: '#F0A01E',
     onWarn: '#1F1400',
+    stop: '#C9372C',
+    onStop: '#FFF4F3',
   },
 };
 

@@ -4,16 +4,14 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Bell } from '@/components/Bell';
 import { Body, Button, Card, Chip, Eyebrow, IconButton, Row, Screen, Title } from '@/components/ui';
 import { levelLabel } from '@/data/labels';
-import { defaultBell, exerciseName, GROUPS, repsLabel, usableWeights, Workout, workouts } from '@/data/workouts';
+import { blockProgress, nextDay, weekProgress } from '@/data/programs';
+import { weeks, weekStreak } from '@/data/stats';
+import { defaultBell, exerciseName, formatLabel, GROUPS, lengthLabel, repsLabel, usableWeights, Workout, workouts } from '@/data/workouts';
 import { Level, useBells } from '@/store/bells';
+import { useProgram } from '@/store/program';
+import { useSessions } from '@/store/sessions';
 import { useTheme } from '@/store/theme';
 import { colors, fonts, themedStyles } from '@/theme';
-
-const STATS = [
-  { value: '3', label: 'sessions this week' },
-  { value: '4,210', label: 'kg moved' },
-  { value: '12', label: 'day streak' },
-];
 
 /** Suggest a full-body workout for the user's level that works with the bells they own. */
 function suggestion(level: Level, owned: Record<number, number>): Workout {
@@ -27,14 +25,28 @@ function suggestion(level: Level, owned: Record<number, number>): Workout {
 export default function Today() {
   const { owned, level } = useBells();
   const { mode, toggle } = useTheme();
+  const { sessions } = useSessions();
+  const { block } = useProgram();
   const w = suggestion(level, owned);
   const bell = defaultBell(usableWeights(w, owned), level);
+
+  const thisWeek = weeks(sessions, 1)[0];
+  const stats = [
+    { value: `${thisWeek?.sessions ?? 0}`, label: 'sessions' },
+    { value: (thisWeek?.kg ?? 0).toLocaleString('en-US'), label: 'kg moved' },
+    { value: `${weekStreak(sessions)}`, label: 'week streak' },
+  ];
+
+  const up = block ? nextDay(block) : undefined;
+  const progress = block ? blockProgress(block) : undefined;
+  const week = block && up ? weekProgress(block, up.week) : undefined;
+  const upBell = up ? defaultBell(usableWeights(up.workout, owned), level) : undefined;
 
   return (
     <Screen inTabs>
       <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 20 }}>
         <View style={{ gap: 6 }}>
-          <Eyebrow>Tuesday · week 3</Eyebrow>
+          <Eyebrow>{block && up ? `${block.name} · week ${up.week}` : 'No plan yet'}</Eyebrow>
           <Title>Good morning</Title>
         </View>
         <IconButton
@@ -44,8 +56,9 @@ export default function Today() {
         />
       </Row>
 
+      <Eyebrow>This week</Eyebrow>
       <Row style={{ alignItems: 'stretch' }}>
-        {STATS.map((s) => (
+        {stats.map((s) => (
           <View key={s.label} style={styles.stat}>
             <Text style={styles.statValue}>{s.value}</Text>
             <Text style={styles.statLabel}>{s.label}</Text>
@@ -53,6 +66,57 @@ export default function Today() {
         ))}
       </Row>
 
+      {block && up ? (
+        <Card>
+          <Eyebrow color={colors.goText}>
+            Next up · week {up.week}, day {up.dayOfWeek}
+          </Eyebrow>
+          <Text style={styles.cardTitle}>{up.title}</Text>
+          <Row style={{ gap: 8 }}>
+            {upBell ? <Bell kg={upBell} size={22} /> : null}
+            <Body muted style={{ fontSize: 14, flex: 1 }}>
+              {formatLabel(up.workout.format)} · {lengthLabel(up.workout)}
+              {upBell ? ` · one ${upBell} kg bell` : ''}
+            </Body>
+          </Row>
+          <View style={styles.planBar}>
+            <View style={[styles.planFill, { width: `${Math.max(2, (progress?.percent ?? 0) * 100)}%` }]} />
+          </View>
+          <Body muted style={{ fontSize: 12 }}>
+            {progress?.done} of {progress?.total} done · {week?.done}/{week?.total} this week
+          </Body>
+          <Row>
+            <Button label="See the plan" variant="secondary" onPress={() => router.push('/plan')} />
+            <Button
+              label="Start"
+              onPress={() =>
+                router.push({ pathname: '/routine', params: upBell ? { id: up.workout.id, kg: String(upBell) } : { id: up.workout.id } })
+              }
+            />
+          </Row>
+        </Card>
+      ) : block ? (
+        <Card>
+          <Eyebrow color={colors.goText}>Block complete</Eyebrow>
+          <Text style={styles.cardTitle}>All four weeks done</Text>
+          <Body muted style={{ fontSize: 14 }}>
+            Every day is behind you. Start the next block — a level up, or the same one with a heavier bell.
+          </Body>
+          <Button label="Start a new block" onPress={() => router.push('/plan-start')} />
+        </Card>
+      ) : (
+        <Card>
+          <Eyebrow color={colors.goText}>Train with a plan</Eyebrow>
+          <Text style={styles.cardTitle}>Four weeks, in order</Text>
+          <Body muted style={{ fontSize: 14 }}>
+            Pick your level and how many days a week you are aiming for. We build the block from the bells you own —
+            no fixed days, so a missed session never breaks it.
+          </Body>
+          <Button label="Build my plan" onPress={() => router.push('/plan-start')} />
+        </Card>
+      )}
+
+      {up ? null : (
       <Card>
         <Eyebrow color={colors.goText}>Suggested for today</Eyebrow>
         <Text style={styles.cardTitle}>{w.name}</Text>
@@ -83,6 +147,7 @@ export default function Today() {
           <Button label="Start" onPress={() => router.push({ pathname: '/routine', params: bell ? { id: w.id, kg: String(bell) } : { id: w.id } })} />
         </Row>
       </Card>
+      )}
 
       <Card style={{ gap: 12 }}>
         <Eyebrow>Train by body part</Eyebrow>
@@ -107,5 +172,7 @@ const styles = themedStyles(() =>
     reps: { fontFamily: fonts.mono, fontSize: 13, color: colors.text },
     link: { fontFamily: fonts.body, fontSize: 13, color: colors.goText },
     groups: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    planBar: { height: 8, borderRadius: 4, backgroundColor: colors.surface2, overflow: 'hidden' },
+    planFill: { height: 8, borderRadius: 4, backgroundColor: colors.go },
   }),
 );

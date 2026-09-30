@@ -82,15 +82,17 @@ export function Mono({ children, style }: { children: ReactNode; style?: StylePr
 type ButtonProps = {
   label: string;
   onPress?: () => void;
-  variant?: 'primary' | 'secondary' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   height?: number;
   style?: StyleProp<ViewStyle>;
   labelStyle?: StyleProp<TextStyle>;
 };
 
 export function Button({ label, onPress, variant = 'primary', height = 56, style, labelStyle }: ButtonProps) {
-  const bg = variant === 'primary' ? colors.go : variant === 'secondary' ? colors.surface2 : 'transparent';
-  const fg = variant === 'primary' ? colors.onGo : variant === 'secondary' ? colors.text : colors.muted;
+  const bg =
+    variant === 'primary' ? colors.go : variant === 'danger' ? colors.stop : variant === 'secondary' ? colors.surface2 : 'transparent';
+  const fg =
+    variant === 'primary' ? colors.onGo : variant === 'danger' ? colors.onStop : variant === 'secondary' ? colors.text : colors.muted;
   return (
     <Pressable
       accessibilityRole="button"

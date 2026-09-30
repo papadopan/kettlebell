@@ -70,6 +70,7 @@ export default function Workout() {
     router.replace({
       pathname: '/summary',
       params: {
+        id: plan?.id ?? '',
         name: plan?.name ?? 'Workout',
         format: plan?.format ?? 'emom',
         bell: String(bell),

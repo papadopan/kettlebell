@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { Format } from '@/data/workouts';
+import { Format, registerLoggedWorkouts, Workout } from '@/data/workouts';
 
 const STORAGE_KEY = 'kettlebelt/sessions/v1';
 
@@ -11,6 +11,13 @@ export type Session = {
   /** ISO date-time the session finished. */
   date: string;
   name: string;
+  /** The workout this session came from, when it is still known. */
+  workoutId?: string;
+  /**
+   * A copy of that workout, frozen at the moment it was logged. Kept so the session
+   * stays openable after the plan is stopped or the workout is deleted.
+   */
+  workout?: Workout;
   format: Format;
   /** Bell weight used, in kg. */
   bell: number;
@@ -31,19 +38,28 @@ type SessionsState = {
 
 const SessionsContext = createContext<SessionsState | null>(null);
 
+/** Keep every workout a session was logged against findable, whatever happened to it since. */
+const keepWorkouts = (list: Session[]) =>
+  registerLoggedWorkouts(list.map((s) => s.workout).filter((w): w is Workout => !!w));
+
 export function SessionsProvider({ children }: { children: ReactNode }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
-      .then((raw) => setSessions(raw ? (JSON.parse(raw) as Session[]) : []))
+      .then((raw) => {
+        const list = raw ? (JSON.parse(raw) as Session[]) : [];
+        setSessions(list);
+        keepWorkouts(list);
+      })
       .catch(() => {})
       .finally(() => setReady(true));
   }, []);
 
   const persist = useCallback((list: Session[]) => {
     setSessions(list);
+    keepWorkouts(list);
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(list)).catch(() => {});
   }, []);
 

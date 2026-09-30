@@ -11,28 +11,61 @@ const kg = (n: number) => n.toLocaleString('en-US');
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 const mmss = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 
-/** Weekly volume. One series, so no legend: only the newest bar carries a value label. */
+/**
+ * Weekly volume. One series, so there is no legend and only the newest week with
+ * work in it carries a value label. A week with nothing in it draws a hairline on
+ * the baseline rather than a coloured bar, so empty never reads as "the highlight".
+ */
 function WeeklyBars({ data }: { data: { label: string; kg: number; sessions: number }[] }) {
+  const withWork = data.filter((w) => w.kg > 0);
   const max = Math.max(...data.map((w) => w.kg), 1);
+  const peak = Math.max(...data.map((w) => w.kg), 0);
+  const newestWithWork = data.reduce((found, w, i) => (w.kg > 0 ? i : found), -1);
+
+  // Nothing in eight weeks: an empty plot is unreadable, so say so instead of drawing it.
+  if (!withWork.length) {
+    return (
+      <View style={styles.chartEmpty}>
+        <Text style={styles.emptyLine}>No weight logged in the last 8 weeks.</Text>
+        <Text style={styles.caption}>
+          Finish a workout and tap “Save to log” — the bars fill in from the kilograms you move.
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={{ gap: 8 }}>
+      <Row style={{ justifyContent: 'space-between' }}>
+        <Text style={styles.caption}>Kilograms moved per week</Text>
+        <Text style={styles.caption}>peak {kg(peak)}</Text>
+      </Row>
       <View style={styles.chart}>
         {data.map((w, i) => {
-          const last = i === data.length - 1;
-          const height = w.kg ? Math.max(4, (w.kg / max) * 120) : 2;
+          const highlight = i === newestWithWork;
+          const empty = w.kg <= 0;
           return (
             <View key={w.label} style={styles.col}>
-              {last && w.kg ? <Text style={styles.barValue}>{kg(w.kg)}</Text> : null}
+              {highlight ? <Text style={styles.barValue}>{kg(w.kg)}</Text> : null}
               <View
                 accessibilityLabel={`Week of ${w.label}: ${kg(w.kg)} kilograms over ${w.sessions} sessions`}
-                style={[styles.bar, { height, backgroundColor: last ? colors.go : w.kg ? colors.surface2 : colors.line }]}
+                style={[
+                  styles.bar,
+                  {
+                    height: empty ? 2 : Math.max(6, (w.kg / max) * 108),
+                    backgroundColor: empty ? colors.line : highlight ? colors.go : colors.surface2,
+                  },
+                ]}
               />
-              <Text style={styles.barLabel}>{w.label}</Text>
+              <Text style={[styles.barLabel, highlight && { color: colors.muted }]}>{w.label}</Text>
             </View>
           );
         })}
       </View>
-      <Text style={styles.caption}>Kilograms moved per week · last {data.length} weeks</Text>
+      <View style={styles.baseline} />
+      <Text style={styles.caption}>
+        Last {data.length} weeks · {withWork.length} with a session in
+      </Text>
     </View>
   );
 }
@@ -169,7 +202,10 @@ export default function Stats() {
       </Card>
 
       <Card style={{ gap: 10 }}>
-        <Eyebrow>Recent sessions</Eyebrow>
+        <Row style={{ justifyContent: 'space-between' }}>
+          <Eyebrow>Recent sessions</Eyebrow>
+          <Text style={styles.caption}>{sessions.length} in total</Text>
+        </Row>
         {sessions.slice(0, 5).map((s) => (
           <Row key={s.id} style={{ justifyContent: 'space-between', gap: 12 }}>
             <View style={{ flex: 1 }}>
@@ -183,6 +219,7 @@ export default function Stats() {
             <Text style={styles.value}>{kg(s.kg)} kg</Text>
           </Row>
         ))}
+        <Button label="See every session" variant="secondary" height={44} onPress={() => router.push('/history')} />
       </Card>
     </Screen>
   );
@@ -192,7 +229,10 @@ const styles = themedStyles(() =>
   StyleSheet.create({
     hero: { fontFamily: fonts.display, fontSize: 56, lineHeight: 58, color: colors.text, fontVariant: ['tabular-nums'] },
     heroUnit: { fontFamily: fonts.body, fontSize: 15, color: colors.muted },
-    chart: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 160, paddingTop: 16 },
+    chart: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 150, paddingTop: 14 },
+    chartEmpty: { gap: 6, paddingVertical: 18 },
+    emptyLine: { fontFamily: fonts.bodyMedium, fontSize: 14, color: colors.text },
+    baseline: { height: 1, backgroundColor: colors.line, marginTop: -8 },
     col: { flex: 1, alignItems: 'center', gap: 6 },
     bar: { width: '100%', borderTopLeftRadius: 4, borderTopRightRadius: 4 },
     barValue: { fontFamily: fonts.mono, fontSize: 10, color: colors.muted },
